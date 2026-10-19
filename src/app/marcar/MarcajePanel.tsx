@@ -1,0 +1,326 @@
+"use client";
+
+/**
+ * Panel de marcaje para el celular del empleado.
+ *
+ * - 4 botones grandes; solo se habilitan los que corresponden según la
+ *   secuencia del día (el servidor vuelve a validar igual).
+ * - Al tocar uno: pide ubicación precisa al navegador → la envía a la
+ *   Server Action → muestra el resultado.
+ * - Si la persona no da permiso de ubicación, la marcación se envía igual
+ *   y queda "en revisión" (la ley no permite bloquearla).
+ *
+ * Requisito: la geolocalización del navegador solo funciona en HTTPS
+ * (o en http://localhost durante el desarrollo).
+ */
+
+import { useEffect, useState, type ReactNode } from "react";
+import {
+  CheckCircle2,
+  Clock,
+  Coffee,
+  Loader2,
+  LogIn,
+  LogOut,
+  MapPin,
+  TriangleAlert,
+  UtensilsCrossed,
+  XCircle,
+  type LucideIcon,
+} from "lucide-react";
+
+import {
+  ETIQUETAS,
+  siguientesPermitidos,
+  type Marcacion,
+  type ResultadoMarcaje,
+  type SolicitudMarcaje,
+  type TipoEvento,
+} from "@/lib/asistencia";
+import { registrarMarcaje } from "./actions";
+import { cerrarSesion } from "@/app/login/actions";
+
+const ZONA = "America/Santiago";
+
+const BOTONES: { tipo: TipoEvento; icono: LucideIcon; color: string }[] = [
+  { tipo: "entrada", icono: LogIn, color: "bg-emerald-600 hover:bg-emerald-700" },
+  { tipo: "inicio_colacion", icono: Coffee, color: "bg-amber-500 hover:bg-amber-600" },
+  { tipo: "fin_colacion", icono: UtensilsCrossed, color: "bg-sky-600 hover:bg-sky-700" },
+  { tipo: "salida", icono: LogOut, color: "bg-rose-600 hover:bg-rose-700" },
+];
+
+type Fase = "libre" | "ubicando" | "enviando";
+
+// ---------------------------------------------------------------------------
+// Geolocalización del navegador envuelta en una promesa
+// ---------------------------------------------------------------------------
+
+type LecturaNavegador =
+  | { ok: true; lat: number; lng: number; precision: number }
+  | { ok: false; motivo: string };
+
+function leerUbicacion(): Promise<LecturaNavegador> {
+  return new Promise((resolve) => {
+    if (!("geolocation" in navigator)) {
+      resolve({ ok: false, motivo: "Este navegador no soporta ubicación." });
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) =>
+        resolve({
+          ok: true,
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          precision: pos.coords.accuracy, // metros
+        }),
+      (err) => {
+        const motivos: Record<number, string> = {
+          [err.PERMISSION_DENIED]:
+            "Permiso de ubicación denegado. Actívalo en los ajustes del navegador.",
+          [err.POSITION_UNAVAILABLE]: "No se pudo obtener la ubicación (GPS apagado o sin señal).",
+          [err.TIMEOUT]: "La ubicación tardó demasiado. Intenta cerca de una ventana.",
+        };
+        resolve({ ok: false, motivo: motivos[err.code] ?? "Error de ubicación desconocido." });
+      },
+      {
+        enableHighAccuracy: true, // fuerza GPS en celulares
+        timeout: 15_000,
+        maximumAge: 0, // no usar una posición guardada en caché
+      },
+    );
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Componente
+// ---------------------------------------------------------------------------
+
+export function MarcajePanel({
+  nombre,
+  marcasHoy,
+}: {
+  nombre: string;
+  marcasHoy: Marcacion[];
+}) {
+  const [fase, setFase] = useState<Fase>("libre");
+  const [tipoActivo, setTipoActivo] = useState<TipoEvento | null>(null);
+  const [resultado, setResultado] = useState<ResultadoMarcaje | null>(null);
+  const [avisoUbicacion, setAvisoUbicacion] = useState<string | null>(null);
+
+  const ultimo = marcasHoy.at(-1)?.tipo ?? null;
+  const permitidos = siguientesPermitidos(ultimo);
+  const ocupado = fase !== "libre";
+
+  async function marcar(tipo: TipoEvento) {
+    if (ocupado) return;
+
+    setTipoActivo(tipo);
+    setResultado(null);
+    setAvisoUbicacion(null);
+
+    // 1. Ubicación
+    setFase("ubicando");
+    const lectura = await leerUbicacion();
+    if (!lectura.ok) setAvisoUbicacion(lectura.motivo);
+
+    // 2. Envío (aunque no haya ubicación: el servidor la marcará en revisión)
+    setFase("enviando");
+    const solicitud: SolicitudMarcaje = {
+      tipo,
+      ubicacion: lectura.ok
+        ? { lat: lectura.lat, lng: lectura.lng, precision: lectura.precision }
+        : null,
+    };
+
+    try {
+      setResultado(await registrarMarcaje(solicitud));
+    } catch {
+      setResultado({ ok: false, mensaje: "Sin conexión con el servidor. Intenta otra vez." });
+    } finally {
+      setFase("libre");
+      setTipoActivo(null);
+    }
+  }
+
+  return (
+    <div className="mx-auto flex max-w-md flex-col gap-6 px-4 py-8">
+      {/* Encabezado */}
+      <header className="space-y-1">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm text-slate-500">Hola,</p>
+            <h1 className="text-2xl font-semibold text-slate-900">{nombre}</h1>
+          </div>
+          <form action={cerrarSesion}>
+            <button
+              type="submit"
+              className="flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100"
+            >
+              <LogOut className="size-4" aria-hidden /> Salir
+            </button>
+          </form>
+        </div>
+        <Reloj />
+      </header>
+
+      {/* Botones */}
+      <section className="grid grid-cols-2 gap-4" aria-label="Marcar asistencia">
+        {BOTONES.map(({ tipo, icono: Icono, color }) => {
+          const habilitado = permitidos.includes(tipo) && !ocupado;
+          const cargando = tipoActivo === tipo && ocupado;
+
+          return (
+            <button
+              key={tipo}
+              type="button"
+              onClick={() => marcar(tipo)}
+              disabled={!habilitado}
+              className={`flex aspect-square flex-col items-center justify-center gap-3 rounded-3xl text-white shadow-sm transition active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none ${color}`}
+            >
+              {cargando ? (
+                <Loader2 className="size-10 animate-spin" aria-hidden />
+              ) : (
+                <Icono className="size-10" aria-hidden />
+              )}
+              <span className="text-lg font-semibold leading-tight">{ETIQUETAS[tipo]}</span>
+            </button>
+          );
+        })}
+      </section>
+
+      {/* Estado del proceso */}
+      <div aria-live="polite" className="space-y-3">
+        {fase === "ubicando" && (
+          <Aviso icono={MapPin} tono="info">
+            Obteniendo tu ubicación…
+          </Aviso>
+        )}
+        {fase === "enviando" && (
+          <Aviso icono={Loader2} tono="info" girar>
+            Registrando…
+          </Aviso>
+        )}
+        {avisoUbicacion && fase === "libre" && (
+          <Aviso icono={TriangleAlert} tono="alerta">
+            {avisoUbicacion}
+          </Aviso>
+        )}
+        {resultado && (
+          <Aviso
+            icono={!resultado.ok ? XCircle : resultado.valida ? CheckCircle2 : TriangleAlert}
+            tono={!resultado.ok ? "error" : resultado.valida ? "ok" : "alerta"}
+          >
+            {resultado.mensaje}
+          </Aviso>
+        )}
+      </div>
+
+      {/* Marcas de hoy */}
+      <section className="rounded-2xl bg-white p-4 shadow-sm">
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <Clock className="size-4" aria-hidden /> Tus marcas de hoy
+        </h2>
+
+        {marcasHoy.length === 0 ? (
+          <p className="text-sm text-slate-500">Aún no registras marcas hoy.</p>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {marcasHoy.map((m) => (
+              <li key={m.id} className="flex items-start justify-between gap-3 py-2 text-sm">
+                <div>
+                  <p className="font-medium text-slate-800">{ETIQUETAS[m.tipo]}</p>
+                  {!m.valida && m.motivo_observacion && (
+                    <p className="text-xs text-amber-700">{m.motivo_observacion}</p>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5 tabular-nums text-slate-600">
+                  {formatearHora(m.marcado_en)}
+                  {m.valida ? (
+                    <CheckCircle2 className="size-4 text-emerald-600" aria-label="Válida" />
+                  ) : (
+                    <TriangleAlert className="size-4 text-amber-500" aria-label="En revisión" />
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Subcomponentes
+// ---------------------------------------------------------------------------
+
+function formatearHora(iso: string) {
+  return new Intl.DateTimeFormat("es-CL", {
+    timeZone: ZONA,
+    hour: "2-digit",
+    hourCycle: "h23", // formato 24 h (14:50, no 02:50 p. m.)
+    minute: "2-digit",
+  }).format(new Date(iso));
+}
+
+/** Reloj en vivo. Se monta solo en el cliente para evitar diferencias de hidratación. */
+function Reloj() {
+  const [ahora, setAhora] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setAhora(new Date());
+    const id = setInterval(() => setAhora(new Date()), 1_000);
+    return () => clearInterval(id);
+  }, []);
+
+  if (!ahora) return <p className="h-9" aria-hidden />;
+
+  return (
+    <div>
+      <p className="text-3xl font-bold tabular-nums text-slate-900">
+        {new Intl.DateTimeFormat("es-CL", {
+          timeZone: ZONA,
+          hour: "2-digit",
+          hourCycle: "h23", // formato 24 h (14:50, no 02:50 p. m.)
+          minute: "2-digit",
+          second: "2-digit",
+        }).format(ahora)}
+      </p>
+      <p className="text-sm capitalize text-slate-500">
+        {new Intl.DateTimeFormat("es-CL", {
+          timeZone: ZONA,
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+        }).format(ahora)}
+      </p>
+    </div>
+  );
+}
+
+const TONOS = {
+  info: "bg-sky-50 text-sky-800 ring-sky-200",
+  ok: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+  alerta: "bg-amber-50 text-amber-800 ring-amber-200",
+  error: "bg-rose-50 text-rose-800 ring-rose-200",
+} as const;
+
+function Aviso({
+  icono: Icono,
+  tono,
+  girar,
+  children,
+}: {
+  icono: LucideIcon;
+  tono: keyof typeof TONOS;
+  girar?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div className={`flex items-start gap-3 rounded-2xl p-4 text-sm ring-1 ${TONOS[tono]}`}>
+      <Icono className={`mt-0.5 size-5 shrink-0 ${girar ? "animate-spin" : ""}`} aria-hidden />
+      <p>{children}</p>
+    </div>
+  );
+}
