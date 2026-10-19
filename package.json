@@ -11,6 +11,7 @@
     "@supabase/ssr": "latest",
     "@supabase/supabase-js": "latest",
     "@tailwindcss/postcss": "^4.3.3",
+    "exceljs": "^4.4.0",
     "lucide-react": "latest",
     "next": "latest",
     "react": "latest",
