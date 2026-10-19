@@ -1,5 +1,10 @@
 /**
- * Horarios semanales (compartido cliente/servidor).
+ * Horarios y turnos (compartido cliente/servidor).
+ *
+ * - Horario BASE: lo normal de cada persona por día de la semana.
+ * - TURNO: horario de una fecha concreta; manda sobre el base ese día
+ *   (o la marca como libre). Sirve para semanas que cambian.
+ *
  * dia_semana sigue ISO 8601: 1 = lunes … 7 = domingo (igual que en la base).
  */
 
@@ -20,48 +25,90 @@ export const DIAS = [
  */
 export const JORNADA_MAX_SEMANAL_H = 42;
 
+export const TOLERANCIA_POR_DEFECTO = 5;
+
 export type DiaHorario = {
   dia_semana: number;
   hora_entrada: string; // "HH:MM"
   hora_salida: string; // "HH:MM"
-  minutos_colacion: number;
   tolerancia_minutos: number;
 };
 
 const RE_HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
+const RE_FECHA = /^\d{4}-\d{2}-\d{2}$/;
+
+export function esHora(s: string): boolean {
+  return RE_HORA.test(s);
+}
 
 export function aMinutos(hhmm: string): number {
   const [h, m] = hhmm.split(":").map(Number);
   return h * 60 + m;
 }
 
-/** Minutos efectivos de un día = (salida − entrada) − colación. */
-export function minutosDelDia(d: Pick<DiaHorario, "hora_entrada" | "hora_salida" | "minutos_colacion">): number {
-  if (!RE_HORA.test(d.hora_entrada) || !RE_HORA.test(d.hora_salida)) return 0;
-  return Math.max(0, aMinutos(d.hora_salida) - aMinutos(d.hora_entrada) - d.minutos_colacion);
+/** Minutos de un tramo entrada → salida. */
+export function minutosTramo(entrada: string, salida: string): number {
+  if (!esHora(entrada) || !esHora(salida)) return 0;
+  return Math.max(0, aMinutos(salida) - aMinutos(entrada));
 }
 
-export function minutosSemana(dias: DiaHorario[]): number {
+export function minutosDelDia(d: Pick<DiaHorario, "hora_entrada" | "hora_salida">): number {
+  return minutosTramo(d.hora_entrada, d.hora_salida);
+}
+
+export function minutosSemana(dias: Pick<DiaHorario, "hora_entrada" | "hora_salida">[]): number {
   return dias.reduce((acc, d) => acc + minutosDelDia(d), 0);
 }
 
-/** Devuelve un mensaje de error o null si el día es válido. */
+/** Valida un tramo entrada/salida. Devuelve mensaje de error o null. */
+export function validarTramo(etiqueta: string, entrada: string, salida: string): string | null {
+  if (!esHora(entrada) || !esHora(salida)) return `${etiqueta}: hora inválida.`;
+  if (aMinutos(salida) <= aMinutos(entrada)) {
+    return `${etiqueta}: la salida debe ser después de la entrada.`;
+  }
+  return null;
+}
+
+/** Valida un día del horario base. */
 export function validarDia(d: DiaHorario): string | null {
   const nombre = DIAS.find((x) => x.n === d.dia_semana)?.nombre ?? `Día ${d.dia_semana}`;
-  if (!RE_HORA.test(d.hora_entrada) || !RE_HORA.test(d.hora_salida)) {
-    return `${nombre}: hora inválida.`;
-  }
-  if (aMinutos(d.hora_salida) <= aMinutos(d.hora_entrada)) {
-    return `${nombre}: la salida debe ser después de la entrada.`;
-  }
-  if (!Number.isInteger(d.minutos_colacion) || d.minutos_colacion < 0 || d.minutos_colacion > 180) {
-    return `${nombre}: la colación debe estar entre 0 y 180 minutos.`;
-  }
-  if (minutosDelDia(d) <= 0) {
-    return `${nombre}: la colación es más larga que la jornada.`;
-  }
+  const error = validarTramo(nombre, d.hora_entrada, d.hora_salida);
+  if (error) return error;
   if (!Number.isInteger(d.tolerancia_minutos) || d.tolerancia_minutos < 0 || d.tolerancia_minutos > 60) {
     return `${nombre}: la tolerancia debe estar entre 0 y 60 minutos.`;
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Semanas (fechas como "YYYY-MM-DD", sin zona horaria)
+// ---------------------------------------------------------------------------
+
+export function esFecha(s: string | undefined | null): s is string {
+  if (!s || !RE_FECHA.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(s);
+}
+
+export function sumarDias(fecha: string, dias: number): string {
+  const d = new Date(`${fecha}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Lunes de la semana que contiene `fecha`. */
+export function lunesDe(fecha: string): string {
+  const d = new Date(`${fecha}T00:00:00Z`);
+  const isoDow = d.getUTCDay() === 0 ? 7 : d.getUTCDay(); // 1..7
+  return sumarDias(fecha, 1 - isoDow);
+}
+
+/** Las 7 fechas (lun→dom) de la semana que empieza en `lunes`. */
+export function fechasSemana(lunes: string): string[] {
+  return Array.from({ length: 7 }, (_, i) => sumarDias(lunes, i));
+}
+
+/** "2026-10-19" → "19/10" */
+export function diaMes(fecha: string): string {
+  return `${fecha.slice(8, 10)}/${fecha.slice(5, 7)}`;
 }

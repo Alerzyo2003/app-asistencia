@@ -26,7 +26,7 @@ export default async function PersonalPage() {
   const { data, error } = await supabase
     .from("usuarios")
     .select(
-      "id, nombre, rut, email, cargo, rol, activo, horarios(dia_semana, hora_entrada, hora_salida, minutos_colacion, tolerancia_minutos)",
+      "id, nombre, rut, email, cargo, rol, activo, horarios(dia_semana, hora_entrada, hora_salida, tolerancia_minutos)",
     )
     .order("activo", { ascending: false })
     .order("nombre");

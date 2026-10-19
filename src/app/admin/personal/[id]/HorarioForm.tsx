@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * Editor del horario semanal de una persona.
+ * Editor del horario BASE semanal de una persona (lo habitual).
+ * Las semanas distintas se ajustan en /admin/turnos sin tocar este horario.
  * El total semanal se recalcula en vivo; el servidor vuelve a validar todo.
  */
 
@@ -25,7 +26,6 @@ type Fila = DiaHorario & { trabaja: boolean };
 const VACIO: Omit<DiaHorario, "dia_semana"> = {
   hora_entrada: "08:30",
   hora_salida: "17:30",
-  minutos_colacion: 60,
   tolerancia_minutos: 5,
 };
 
@@ -56,7 +56,6 @@ export function HorarioForm({ usuarioId, actual }: { usuarioId: string; actual: 
               trabaja: true,
               hora_entrada: lunes.hora_entrada,
               hora_salida: lunes.hora_salida,
-              minutos_colacion: lunes.minutos_colacion,
               tolerancia_minutos: lunes.tolerancia_minutos,
             }
           : f,
@@ -72,13 +71,12 @@ export function HorarioForm({ usuarioId, actual }: { usuarioId: string; actual: 
       <input type="hidden" name="id" value={usuarioId} />
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] text-left text-sm">
+        <table className="w-full min-w-[520px] text-left text-sm">
           <thead className="text-xs uppercase tracking-wide text-slate-500">
             <tr>
               <th className="py-2 pr-3">Día</th>
               <th className="px-2 py-2">Entrada</th>
               <th className="px-2 py-2">Salida</th>
-              <th className="px-2 py-2">Colación (min)</th>
               <th className="px-2 py-2">Tolerancia (min)</th>
               <th className="py-2 pl-2 text-right">Horas</th>
             </tr>
@@ -124,21 +122,6 @@ export function HorarioForm({ usuarioId, actual }: { usuarioId: string; actual: 
                   <td className="px-2 py-2">
                     <input
                       type="number"
-                      name={`colacion_${f.dia_semana}`}
-                      min={0}
-                      max={180}
-                      step={5}
-                      value={f.minutos_colacion}
-                      disabled={!f.trabaja}
-                      onChange={(e) =>
-                        cambiar(f.dia_semana, { minutos_colacion: Number(e.target.value) })
-                      }
-                      className={campo}
-                    />
-                  </td>
-                  <td className="px-2 py-2">
-                    <input
-                      type="number"
                       name={`tolerancia_${f.dia_semana}`}
                       min={0}
                       max={60}
@@ -165,7 +148,7 @@ export function HorarioForm({ usuarioId, actual }: { usuarioId: string; actual: 
           </tbody>
           <tfoot>
             <tr className="border-t border-slate-200 font-semibold">
-              <td colSpan={5} className="py-3 pr-3 text-right text-slate-600">
+              <td colSpan={4} className="py-3 pr-3 text-right text-slate-600">
                 Total semanal
               </td>
               <td className={`py-3 pl-2 text-right tabular-nums ${excede ? "text-amber-700" : ""}`}>
@@ -179,8 +162,8 @@ export function HorarioForm({ usuarioId, actual }: { usuarioId: string; actual: 
       {excede && (
         <p className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
           <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
-          Supera las {JORNADA_MAX_SEMANAL_H} horas semanales de jornada ordinaria. Revisa si
-          corresponde o si parte son horas extra.
+          Supera las {JORNADA_MAX_SEMANAL_H} horas semanales. Ojo: este total incluye la
+          colación, que no cuenta como jornada. Revisa si corresponde o si parte son horas extra.
         </p>
       )}
 
@@ -188,7 +171,7 @@ export function HorarioForm({ usuarioId, actual }: { usuarioId: string; actual: 
 
       <div className="flex flex-wrap gap-2">
         <BotonEnviar className={botonPrimario}>
-          <Save className="size-4" aria-hidden /> Guardar horario
+          <Save className="size-4" aria-hidden /> Guardar horario base
         </BotonEnviar>
         <button type="button" onClick={copiarLunes} className={botonSecundario}>
           <CopyCheck className="size-4" aria-hidden /> Copiar lunes a mar–vie

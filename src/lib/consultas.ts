@@ -8,7 +8,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { TipoEvento } from "./asistencia";
+import type { TipoRegistro } from "./asistencia";
 import type { Filtros } from "./filtros";
 
 /** Supabase limita a 1000 filas por consulta por defecto. */
@@ -19,7 +19,7 @@ export type Empleado = { id: string; nombre: string; rut: string | null; activo:
 export type FilaMarca = {
   id: number;
   usuario_id: string;
-  tipo: TipoEvento;
+  tipo: TipoRegistro;
   marcado_en: string;
   fecha: string;
   valida: boolean;
@@ -29,6 +29,7 @@ export type FilaMarca = {
   latitud: number | null;
   longitud: number | null;
   ip: string | null;
+  foto_path: string | null;
   nombre: string;
   rut: string | null;
 };
@@ -39,14 +40,15 @@ export type FilaJornada = {
   rut: string | null;
   fecha: string;
   entrada: string | null;
-  inicio_colacion: string | null;
-  fin_colacion: string | null;
   salida: string | null;
+  /** De dónde sale el horario esperado: turno de la fecha, horario base, día libre o ninguno */
+  origen_horario: "turno" | "base" | "libre" | null;
   hora_entrada_pactada: string | null;
   hora_salida_pactada: string | null;
   minutos_trabajados: number | null;
   minutos_atraso: number;
   marcas_observadas: number;
+  fotos: number;
 };
 
 export type ResumenEmpleado = {
@@ -94,7 +96,7 @@ function consultaMarcas(supabase: SupabaseClient, f: Filtros) {
   let q = supabase
     .from("asistencia")
     .select(
-      "id, usuario_id, tipo, marcado_en, fecha, valida, motivo_observacion, distancia_m, precision_m, latitud, longitud, ip, usuarios(nombre, rut)",
+      "id, usuario_id, tipo, marcado_en, fecha, valida, motivo_observacion, distancia_m, precision_m, latitud, longitud, ip, foto_path, usuarios(nombre, rut)",
     )
     .gte("fecha", f.desde)
     .lte("fecha", f.hasta)

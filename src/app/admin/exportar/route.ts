@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
           "Latitud",
           "Longitud",
           "IP",
+          "Foto",
         ],
         marcas.map((m) => [
           fechaCorta(m.fecha),
@@ -62,6 +63,7 @@ export async function GET(request: NextRequest) {
           m.latitud,
           m.longitud,
           m.ip,
+          m.foto_path ? "Sí" : "No",
         ]),
       );
     } else {
@@ -71,11 +73,10 @@ export async function GET(request: NextRequest) {
           "Fecha",
           "Persona",
           "RUT",
+          "Horario según",
           "Entrada pactada",
           "Salida pactada",
           "Entrada",
-          "Inicio colación",
-          "Fin colación",
           "Salida",
           "Trabajado (h:mm)",
           "Trabajado (min)",
@@ -86,11 +87,16 @@ export async function GET(request: NextRequest) {
           fechaCorta(j.fecha),
           j.nombre,
           j.rut,
+          j.origen_horario === "turno"
+            ? "Turno"
+            : j.origen_horario === "base"
+              ? "Horario base"
+              : j.origen_horario === "libre"
+                ? "Día libre"
+                : "Sin horario",
           j.hora_entrada_pactada ? horaPactada(j.hora_entrada_pactada) : null,
           j.hora_salida_pactada ? horaPactada(j.hora_salida_pactada) : null,
           j.entrada ? hora(j.entrada) : null,
-          j.inicio_colacion ? hora(j.inicio_colacion) : null,
-          j.fin_colacion ? hora(j.fin_colacion) : null,
           j.salida ? hora(j.salida) : null,
           j.minutos_trabajados === null ? "Incompleta" : hhmm(j.minutos_trabajados),
           j.minutos_trabajados,

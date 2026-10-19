@@ -2,38 +2,28 @@
  * Tipos y reglas de negocio de las marcaciones (compartido cliente/servidor).
  */
 
-export const TIPOS_EVENTO = [
-  "entrada",
-  "inicio_colacion",
-  "fin_colacion",
-  "salida",
-] as const;
-
+/** Lo que el personal puede marcar hoy. */
+export const TIPOS_EVENTO = ["entrada", "salida"] as const;
 export type TipoEvento = (typeof TIPOS_EVENTO)[number];
 
-export const ETIQUETAS: Record<TipoEvento, string> = {
+/**
+ * Tipos que pueden existir en la base. Las marcas de colación son de la
+ * versión anterior: se conservan y se muestran, pero ya no se pueden crear.
+ */
+export type TipoRegistro = TipoEvento | "inicio_colacion" | "fin_colacion";
+
+export const ETIQUETAS: Record<TipoRegistro, string> = {
   entrada: "Entrada",
+  salida: "Salida",
   inicio_colacion: "Inicio colación",
   fin_colacion: "Fin colación",
-  salida: "Salida",
 };
 
-/**
- * Secuencia permitida dentro de una jornada:
- *
- *   (nada) → entrada → inicio_colacion → fin_colacion → salida
- *                   ↘───────────── salida (jornada sin colación)
- */
-const SIGUIENTES: Record<TipoEvento | "ninguno", TipoEvento[]> = {
-  ninguno: ["entrada"],
-  entrada: ["inicio_colacion", "salida"],
-  inicio_colacion: ["fin_colacion"],
-  fin_colacion: ["salida"],
-  salida: [],
-};
-
-export function siguientesPermitidos(ultimo: TipoEvento | null): TipoEvento[] {
-  return SIGUIENTES[ultimo ?? "ninguno"];
+/** Secuencia del día: (nada) → entrada → salida. */
+export function siguientesPermitidos(ultimo: TipoRegistro | null): TipoEvento[] {
+  if (ultimo === null) return ["entrada"];
+  if (ultimo === "salida") return [];
+  return ["salida"]; // tras entrada (o una colación antigua) solo queda la salida
 }
 
 export function esTipoEvento(valor: unknown): valor is TipoEvento {
@@ -43,17 +33,12 @@ export function esTipoEvento(valor: unknown): valor is TipoEvento {
 /** Fila de la tabla `asistencia` tal como la mostramos en pantalla. */
 export type Marcacion = {
   id: number;
-  tipo: TipoEvento;
+  tipo: TipoRegistro;
   marcado_en: string;
   valida: boolean;
   motivo_observacion: string | null;
   distancia_m: number | null;
-};
-
-/** Lo que el navegador envía al servidor. Las coordenadas pueden faltar. */
-export type SolicitudMarcaje = {
-  tipo: TipoEvento;
-  ubicacion: { lat: number; lng: number; precision: number } | null;
+  foto_path: string | null;
 };
 
 export type ResultadoMarcaje =
@@ -67,6 +52,9 @@ export type ResultadoMarcaje =
       ok: false;
       mensaje: string;
     };
+
+/** Foto: tamaño máximo aceptado por el servidor (la app la comprime antes). */
+export const FOTO_MAX_BYTES = 900 * 1024;
 
 /** Fecha de hoy (YYYY-MM-DD) en la zona horaria indicada. */
 export function fechaHoy(zona: string): string {

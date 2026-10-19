@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { BarChart3, ListChecks, Users } from "lucide-react";
+import { BarChart3, CalendarDays, ListChecks, Users } from "lucide-react";
 
 const LINKS = [
   { href: "/admin/asistencia", texto: "Registros", icono: ListChecks },
   { href: "/admin/reportes", texto: "Reporte de horas", icono: BarChart3 },
+  { href: "/admin/turnos", texto: "Turnos", icono: CalendarDays, sinFiltros: true },
   { href: "/admin/personal", texto: "Personal", icono: Users, sinFiltros: true },
 ];
 
@@ -21,7 +22,8 @@ export function NavAdmin() {
       {LINKS.map(({ href, texto, icono: Icono, sinFiltros }) => {
         const activo = ruta.startsWith(href);
         // Los filtros de fecha solo tienen sentido en Registros y Reporte.
-        const conQuery = query && !sinFiltros && !ruta.startsWith("/admin/personal");
+        const conQuery =
+          query && !sinFiltros && !ruta.startsWith("/admin/personal") && !ruta.startsWith("/admin/turnos");
         return (
           <Link
             key={href}

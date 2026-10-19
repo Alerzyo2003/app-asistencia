@@ -24,7 +24,7 @@ export default async function MarcarPage() {
     supabase.from("usuarios").select("nombre").eq("id", user.id).single(),
     supabase
       .from("asistencia")
-      .select("id, tipo, marcado_en, valida, motivo_observacion, distancia_m")
+      .select("id, tipo, marcado_en, valida, motivo_observacion, distancia_m, foto_path")
       .eq("usuario_id", user.id)
       .eq("fecha", fechaHoy(ZONA_HORARIA))
       .order("marcado_en", { ascending: true }),

@@ -36,7 +36,7 @@ export default async function FichaPersonaPage({ params, searchParams }: Props) 
       .maybeSingle(),
     supabase
       .from("horarios")
-      .select("dia_semana, hora_entrada, hora_salida, minutos_colacion, tolerancia_minutos")
+      .select("dia_semana, hora_entrada, hora_salida, tolerancia_minutos")
       .eq("usuario_id", id)
       .order("dia_semana"),
   ]);
@@ -83,7 +83,7 @@ export default async function FichaPersonaPage({ params, searchParams }: Props) 
 
       <section className={tarjeta}>
         <h2 className="mb-4 flex items-center gap-2 font-semibold">
-          <CalendarClock className="size-5 text-sky-600" aria-hidden /> Horario semanal
+          <CalendarClock className="size-5 text-sky-600" aria-hidden /> Horario base semanal
         </h2>
         <HorarioForm usuarioId={persona.id} actual={horarioActual} />
       </section>

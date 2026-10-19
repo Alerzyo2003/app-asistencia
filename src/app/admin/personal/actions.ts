@@ -225,7 +225,7 @@ export async function guardarHorario(_prev: EstadoAccion, fd: FormData): Promise
   const id = texto(fd, "id", 40);
   if (!RE_UUID.test(id)) return { ok: false, mensaje: "Persona no válida." };
 
-  // Leer los 7 días del formulario: trabaja_N, entrada_N, salida_N, colacion_N, tolerancia_N
+  // Leer los 7 días del formulario: trabaja_N, entrada_N, salida_N, tolerancia_N
   const dias: DiaHorario[] = [];
   for (const { n } of DIAS) {
     if (fd.get(`trabaja_${n}`) !== "on") continue;
@@ -233,7 +233,6 @@ export async function guardarHorario(_prev: EstadoAccion, fd: FormData): Promise
       dia_semana: n,
       hora_entrada: texto(fd, `entrada_${n}`, 5),
       hora_salida: texto(fd, `salida_${n}`, 5),
-      minutos_colacion: Number(fd.get(`colacion_${n}`) ?? 0),
       tolerancia_minutos: Number(fd.get(`tolerancia_${n}`) ?? 0),
     };
     const error = validarDia(dia);
@@ -275,6 +274,8 @@ export async function guardarHorario(_prev: EstadoAccion, fd: FormData): Promise
   revalidatePath(`/admin/personal/${id}`);
   return {
     ok: true,
-    mensaje: dias.length ? "Horario guardado." : "Horario borrado: la persona no tiene días asignados.",
+    mensaje: dias.length
+      ? "Horario base guardado."
+      : "Horario base borrado: la persona no tiene días asignados.",
   };
 }

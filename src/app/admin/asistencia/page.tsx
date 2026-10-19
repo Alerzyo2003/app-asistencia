@@ -9,6 +9,7 @@ import { ETIQUETAS } from "@/lib/asistencia";
 import { leerFiltros } from "@/lib/filtros";
 import { LIMITE_FILAS, listarEmpleados, listarMarcas } from "@/lib/consultas";
 import { fecha, hora } from "@/lib/formato";
+import { urlsFirmadas } from "@/lib/fotos";
 import { FiltrosForm } from "../FiltrosForm";
 
 type Props = {
@@ -25,6 +26,9 @@ export default async function RegistrosPage({ searchParams }: Props) {
   ]);
 
   const enRevision = filas.filter((f) => !f.valida).length;
+
+  // Enlaces temporales (1 h) para ver las fotos del bucket privado.
+  const fotos = await urlsFirmadas(filas.map((f) => f.foto_path ?? ""));
 
   return (
     <div className="space-y-5">
@@ -59,13 +63,14 @@ export default async function RegistrosPage({ searchParams }: Props) {
       )}
 
       <div className="overflow-x-auto rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-        <table className="w-full min-w-[860px] text-left text-sm">
+        <table className="w-full min-w-[920px] text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
             <tr>
               <th className="px-4 py-3">Fecha</th>
               <th className="px-4 py-3">Hora</th>
               <th className="px-4 py-3">Persona</th>
               <th className="px-4 py-3">Tipo</th>
+              <th className="px-4 py-3">Foto</th>
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3 text-right">Distancia</th>
               <th className="px-4 py-3 text-right">Precisión GPS</th>
@@ -75,7 +80,7 @@ export default async function RegistrosPage({ searchParams }: Props) {
           <tbody className="divide-y divide-slate-100">
             {filas.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-slate-500">
+                <td colSpan={9} className="px-4 py-10 text-center text-slate-500">
                   No hay marcas para estos filtros.
                 </td>
               </tr>
@@ -87,6 +92,27 @@ export default async function RegistrosPage({ searchParams }: Props) {
                 <td className="px-4 py-3 font-medium tabular-nums">{hora(m.marcado_en)}</td>
                 <td className="px-4 py-3">{m.nombre}</td>
                 <td className="px-4 py-3">{ETIQUETAS[m.tipo]}</td>
+                <td className="px-4 py-2">
+                  {m.foto_path && fotos.get(m.foto_path) ? (
+                    <a
+                      href={fotos.get(m.foto_path)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Ver foto"
+                      className="block size-10 overflow-hidden rounded-lg ring-1 ring-slate-200 hover:ring-sky-400"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={fotos.get(m.foto_path)}
+                        alt={`Foto de ${m.nombre}`}
+                        loading="lazy"
+                        className="size-full object-cover"
+                      />
+                    </a>
+                  ) : (
+                    <span className="text-slate-300">—</span>
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   {m.valida ? (
                     <span className="inline-flex items-center gap-1 text-emerald-700">

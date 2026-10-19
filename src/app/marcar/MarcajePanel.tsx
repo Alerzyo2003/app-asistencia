@@ -3,28 +3,29 @@
 /**
  * Panel de marcaje para el celular del empleado.
  *
- * - 4 botones grandes; solo se habilitan los que corresponden según la
- *   secuencia del día (el servidor vuelve a validar igual).
- * - Al tocar uno: pide ubicación precisa al navegador → la envía a la
- *   Server Action → muestra el resultado.
- * - Si la persona no da permiso de ubicación, la marcación se envía igual
- *   y queda "en revisión" (la ley no permite bloquearla).
+ * - 2 botones grandes: Entrada y Salida. Solo se habilita el que corresponde
+ *   (el servidor vuelve a validar igual).
+ * - Foto opcional: se toma con la cámara en vivo (no hay acceso a galería)
+ *   y se adjunta a la siguiente marca.
+ * - Al marcar: pide ubicación precisa → envía todo a la Server Action.
+ * - Si la persona no da permiso de ubicación, la marca se envía igual y queda
+ *   "en revisión" (la ley no permite bloquearla).
  *
- * Requisito: la geolocalización del navegador solo funciona en HTTPS
- * (o en http://localhost durante el desarrollo).
+ * Requisito: HTTPS (o http://localhost en desarrollo) para ubicación y cámara.
  */
 
 import { useEffect, useState, type ReactNode } from "react";
 import {
+  Camera,
   CheckCircle2,
   Clock,
-  Coffee,
+  ImageIcon,
   Loader2,
   LogIn,
   LogOut,
   MapPin,
   TriangleAlert,
-  UtensilsCrossed,
+  X,
   XCircle,
   type LucideIcon,
 } from "lucide-react";
@@ -34,18 +35,16 @@ import {
   siguientesPermitidos,
   type Marcacion,
   type ResultadoMarcaje,
-  type SolicitudMarcaje,
   type TipoEvento,
 } from "@/lib/asistencia";
 import { registrarMarcaje } from "./actions";
 import { cerrarSesion } from "@/app/login/actions";
+import { CamaraFoto } from "./CamaraFoto";
 
 const ZONA = "America/Santiago";
 
 const BOTONES: { tipo: TipoEvento; icono: LucideIcon; color: string }[] = [
   { tipo: "entrada", icono: LogIn, color: "bg-emerald-600 hover:bg-emerald-700" },
-  { tipo: "inicio_colacion", icono: Coffee, color: "bg-amber-500 hover:bg-amber-600" },
-  { tipo: "fin_colacion", icono: UtensilsCrossed, color: "bg-sky-600 hover:bg-sky-700" },
   { tipo: "salida", icono: LogOut, color: "bg-rose-600 hover:bg-rose-700" },
 ];
 
@@ -108,9 +107,25 @@ export function MarcajePanel({
   const [resultado, setResultado] = useState<ResultadoMarcaje | null>(null);
   const [avisoUbicacion, setAvisoUbicacion] = useState<string | null>(null);
 
+  // Foto opcional
+  const [camaraAbierta, setCamaraAbierta] = useState(false);
+  const [foto, setFoto] = useState<{ blob: Blob; url: string } | null>(null);
+
   const ultimo = marcasHoy.at(-1)?.tipo ?? null;
   const permitidos = siguientesPermitidos(ultimo);
   const ocupado = fase !== "libre";
+  const jornadaCerrada = permitidos.length === 0;
+
+  function guardarFoto(blob: Blob) {
+    if (foto) URL.revokeObjectURL(foto.url);
+    setFoto({ blob, url: URL.createObjectURL(blob) });
+    setCamaraAbierta(false);
+  }
+
+  function quitarFoto() {
+    if (foto) URL.revokeObjectURL(foto.url);
+    setFoto(null);
+  }
 
   async function marcar(tipo: TipoEvento) {
     if (ocupado) return;
@@ -126,15 +141,19 @@ export function MarcajePanel({
 
     // 2. Envío (aunque no haya ubicación: el servidor la marcará en revisión)
     setFase("enviando");
-    const solicitud: SolicitudMarcaje = {
-      tipo,
-      ubicacion: lectura.ok
-        ? { lat: lectura.lat, lng: lectura.lng, precision: lectura.precision }
-        : null,
-    };
+    const fd = new FormData();
+    fd.set("tipo", tipo);
+    if (lectura.ok) {
+      fd.set("lat", String(lectura.lat));
+      fd.set("lng", String(lectura.lng));
+      fd.set("precision", String(lectura.precision));
+    }
+    if (foto) fd.set("foto", foto.blob, "foto.jpg");
 
     try {
-      setResultado(await registrarMarcaje(solicitud));
+      const r = await registrarMarcaje(fd);
+      setResultado(r);
+      if (r.ok) quitarFoto(); // la foto ya se usó
     } catch {
       setResultado({ ok: false, mensaje: "Sin conexión con el servidor. Intenta otra vez." });
     } finally {
@@ -164,6 +183,46 @@ export function MarcajePanel({
         <Reloj />
       </header>
 
+      {/* Foto opcional */}
+      {!jornadaCerrada && (
+        <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+          {foto ? (
+            <div className="flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={foto.url} alt="Foto tomada" className="size-16 rounded-xl object-cover" />
+              <div className="flex-1 text-sm">
+                <p className="font-medium text-slate-800">Foto lista</p>
+                <p className="text-slate-500">Se enviará con tu próxima marca.</p>
+              </div>
+              <button
+                type="button"
+                onClick={quitarFoto}
+                disabled={ocupado}
+                className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
+                aria-label="Quitar foto"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setCamaraAbierta(true)}
+              disabled={ocupado}
+              className="flex w-full items-center gap-3 text-left"
+            >
+              <span className="flex size-12 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
+                <Camera className="size-6" aria-hidden />
+              </span>
+              <span className="text-sm">
+                <span className="block font-medium text-slate-800">Agregar foto</span>
+                <span className="text-slate-500">Opcional · se toma con la cámara</span>
+              </span>
+            </button>
+          )}
+        </section>
+      )}
+
       {/* Botones */}
       <section className="grid grid-cols-2 gap-4" aria-label="Marcar asistencia">
         {BOTONES.map(({ tipo, icono: Icono, color }) => {
@@ -179,11 +238,11 @@ export function MarcajePanel({
               className={`flex aspect-square flex-col items-center justify-center gap-3 rounded-3xl text-white shadow-sm transition active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none ${color}`}
             >
               {cargando ? (
-                <Loader2 className="size-10 animate-spin" aria-hidden />
+                <Loader2 className="size-12 animate-spin" aria-hidden />
               ) : (
-                <Icono className="size-10" aria-hidden />
+                <Icono className="size-12" aria-hidden />
               )}
-              <span className="text-lg font-semibold leading-tight">{ETIQUETAS[tipo]}</span>
+              <span className="text-xl font-semibold">{ETIQUETAS[tipo]}</span>
             </button>
           );
         })}
@@ -198,7 +257,7 @@ export function MarcajePanel({
         )}
         {fase === "enviando" && (
           <Aviso icono={Loader2} tono="info" girar>
-            Registrando…
+            {foto ? "Registrando y subiendo foto…" : "Registrando…"}
           </Aviso>
         )}
         {avisoUbicacion && fase === "libre" && (
@@ -229,7 +288,12 @@ export function MarcajePanel({
             {marcasHoy.map((m) => (
               <li key={m.id} className="flex items-start justify-between gap-3 py-2 text-sm">
                 <div>
-                  <p className="font-medium text-slate-800">{ETIQUETAS[m.tipo]}</p>
+                  <p className="flex items-center gap-1.5 font-medium text-slate-800">
+                    {ETIQUETAS[m.tipo]}
+                    {m.foto_path && (
+                      <ImageIcon className="size-3.5 text-slate-400" aria-label="Con foto" />
+                    )}
+                  </p>
                   {!m.valida && m.motivo_observacion && (
                     <p className="text-xs text-amber-700">{m.motivo_observacion}</p>
                   )}
@@ -247,6 +311,10 @@ export function MarcajePanel({
           </ul>
         )}
       </section>
+
+      {camaraAbierta && (
+        <CamaraFoto onCapturar={guardarFoto} onCerrar={() => setCamaraAbierta(false)} />
+      )}
     </div>
   );
 }
@@ -259,7 +327,7 @@ function formatearHora(iso: string) {
   return new Intl.DateTimeFormat("es-CL", {
     timeZone: ZONA,
     hour: "2-digit",
-    hourCycle: "h23", // formato 24 h (14:50, no 02:50 p. m.)
+    hourCycle: "h23",
     minute: "2-digit",
   }).format(new Date(iso));
 }
@@ -282,7 +350,7 @@ function Reloj() {
         {new Intl.DateTimeFormat("es-CL", {
           timeZone: ZONA,
           hour: "2-digit",
-          hourCycle: "h23", // formato 24 h (14:50, no 02:50 p. m.)
+          hourCycle: "h23",
           minute: "2-digit",
           second: "2-digit",
         }).format(ahora)}

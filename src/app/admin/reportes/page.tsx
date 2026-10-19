@@ -142,14 +142,13 @@ export default async function ReportesPage({ searchParams }: Props) {
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-slate-700">Detalle por día</h2>
         <div className="overflow-x-auto rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-          <table className="w-full min-w-[900px] text-left text-sm">
+          <table className="w-full min-w-[800px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-4 py-3">Fecha</th>
                 <th className="px-4 py-3">Persona</th>
                 <th className="px-4 py-3">Horario</th>
                 <th className="px-4 py-3">Entrada</th>
-                <th className="px-4 py-3">Colación</th>
                 <th className="px-4 py-3">Salida</th>
                 <th className="px-4 py-3 text-right">Trabajado</th>
                 <th className="px-4 py-3 text-right">Atraso</th>
@@ -164,16 +163,22 @@ export default async function ReportesPage({ searchParams }: Props) {
                   <td className="whitespace-nowrap px-4 py-3 text-slate-600">{fecha(j.fecha)}</td>
                   <td className="px-4 py-3">{j.nombre}</td>
                   <td className="px-4 py-3 tabular-nums text-slate-500">
-                    {j.hora_entrada_pactada
-                      ? `${horaPactada(j.hora_entrada_pactada)}–${horaPactada(j.hora_salida_pactada)}`
-                      : "Sin horario"}
+                    {j.origen_horario === "libre" ? (
+                      <span className="text-slate-400">Día libre</span>
+                    ) : j.hora_entrada_pactada ? (
+                      <>
+                        {horaPactada(j.hora_entrada_pactada)}–{horaPactada(j.hora_salida_pactada)}
+                        {j.origen_horario === "turno" && (
+                          <span className="ml-1.5 rounded bg-violet-50 px-1.5 py-0.5 text-xs font-medium text-violet-700">
+                            Turno
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      "Sin horario"
+                    )}
                   </td>
                   <td className="px-4 py-3 tabular-nums">{hora(j.entrada)}</td>
-                  <td className="px-4 py-3 tabular-nums">
-                    {j.inicio_colacion
-                      ? `${hora(j.inicio_colacion)}–${hora(j.fin_colacion)}`
-                      : "—"}
-                  </td>
                   <td className="px-4 py-3 tabular-nums">{hora(j.salida)}</td>
                   <td className="px-4 py-3 text-right tabular-nums">
                     {j.minutos_trabajados === null ? (
@@ -197,8 +202,9 @@ export default async function ReportesPage({ searchParams }: Props) {
           </table>
         </div>
         <p className="text-xs text-slate-500">
-          Las filas destacadas tienen al menos una marca en revisión. El atraso solo se cuenta
-          cuando supera la tolerancia del horario de cada persona.
+          Las filas destacadas tienen al menos una marca en revisión. Las horas trabajadas son
+          de entrada a salida (incluyen la colación). El atraso se calcula contra el turno de
+          ese día o, si no hay, contra el horario base, y solo cuenta si supera la tolerancia.
         </p>
       </section>
     </div>
