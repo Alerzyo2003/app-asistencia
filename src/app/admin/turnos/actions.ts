@@ -21,13 +21,14 @@ import {
   sumarDias,
   validarTramo,
   diaMes,
+  horarioEfectivo,
 } from "@/lib/horarios";
 import type { EstadoAccion } from "../personal/actions";
 
 const RE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NO_AUTORIZADO: EstadoAccion = { ok: false, mensaje: "No tienes permisos para esto." };
 
-type Base = { dia_semana: number; hora_entrada: string; hora_salida: string; tolerancia_minutos: number };
+type Base = { hora_entrada: string; hora_salida: string; tolerancia_minutos: number };
 
 /** Lee y valida el lunes de la semana. */
 function leerLunes(fd: FormData): string | null {
@@ -49,19 +50,30 @@ export async function guardarSemana(_prev: EstadoAccion, fd: FormData): Promise<
   const admin = createAdminClient();
   const fechas = fechasSemana(lunes);
 
-  // Horario base de la persona (se consulta aquí: no se confía en el navegador)
-  const { data: baseData, error: errorBase } = await admin
-    .from("horarios")
-    .select("dia_semana, hora_entrada, hora_salida, tolerancia_minutos")
-    .eq("usuario_id", usuarioId);
-  if (errorBase) return { ok: false, mensaje: "No se pudo leer el horario base." };
+  // Horario base y ciclo de la persona (se consultan aquí: no se confía en el navegador)
+  const [{ data: baseData, error: errorBase }, { data: persona, error: errorPersona }] =
+    await Promise.all([
+      admin
+        .from("horarios")
+        .select("semana_ciclo, dia_semana, hora_entrada, hora_salida, tolerancia_minutos")
+        .eq("usuario_id", usuarioId),
+      admin.from("usuarios").select("ciclo_semanas, ciclo_inicio").eq("id", usuarioId).single(),
+    ]);
+  if (errorBase || errorPersona) return { ok: false, mensaje: "No se pudo leer el horario base." };
 
-  const base = new Map<number, Base>(
-    (baseData ?? []).map((b) => [
-      b.dia_semana,
-      { ...b, hora_entrada: b.hora_entrada.slice(0, 5), hora_salida: b.hora_salida.slice(0, 5) },
-    ]),
-  );
+  /** Horario base que corresponde a una fecha (semana A/B del ciclo). */
+  const baseDe = (fecha: string): Base | undefined => {
+    const e = horarioEfectivo({
+      fecha,
+      base: baseData ?? [],
+      turno: null,
+      cicloSemanas: persona.ciclo_semanas,
+      cicloInicio: persona.ciclo_inicio,
+    });
+    return e.tipo === "trabajo"
+      ? { hora_entrada: e.entrada, hora_salida: e.salida, tolerancia_minutos: e.tolerancia }
+      : undefined;
+  };
 
   const aGuardar: {
     usuario_id: string;
@@ -77,7 +89,7 @@ export async function guardarSemana(_prev: EstadoAccion, fd: FormData): Promise<
 
   for (let i = 0; i < 7; i++) {
     const fecha = fechas[i];
-    const b = base.get(i + 1);
+    const b = baseDe(fecha);
     const libre = fd.get(`libre_${i}`) === "on";
     const entrada = String(fd.get(`entrada_${i}`) ?? "").slice(0, 5);
     const salida = String(fd.get(`salida_${i}`) ?? "").slice(0, 5);

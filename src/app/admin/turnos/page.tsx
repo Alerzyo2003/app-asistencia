@@ -11,7 +11,17 @@ import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { ZONA_HORARIA } from "@/lib/config";
 import { fechaHoy } from "@/lib/asistencia";
-import { DIAS, diaMes, esFecha, fechasSemana, lunesDe, sumarDias } from "@/lib/horarios";
+import {
+  DIAS,
+  diaMes,
+  esFecha,
+  fechasSemana,
+  horarioEfectivo,
+  letraSemana,
+  lunesDe,
+  semanaDelCiclo,
+  sumarDias,
+} from "@/lib/horarios";
 import { FilaSemana, type CeldaDia } from "./FilaSemana";
 import { CopiarSemana } from "./CopiarSemana";
 
@@ -31,8 +41,14 @@ export default async function TurnosPage({ searchParams }: Props) {
   const supabase = await createClient();
   const [{ data: personas, error: e1 }, { data: horarios, error: e2 }, { data: turnos, error: e3 }] =
     await Promise.all([
-      supabase.from("usuarios").select("id, nombre, cargo").eq("activo", true).order("nombre"),
-      supabase.from("horarios").select("usuario_id, dia_semana, hora_entrada, hora_salida"),
+      supabase
+        .from("usuarios")
+        .select("id, nombre, cargo, ciclo_semanas, ciclo_inicio")
+        .eq("activo", true)
+        .order("nombre"),
+      supabase
+        .from("horarios")
+        .select("usuario_id, semana_ciclo, dia_semana, hora_entrada, hora_salida, tolerancia_minutos"),
       supabase
         .from("turnos")
         .select("usuario_id, fecha, libre, hora_entrada, hora_salida")
@@ -44,14 +60,22 @@ export default async function TurnosPage({ searchParams }: Props) {
   if (error) throw new Error(`No se pudieron cargar los turnos: ${error.message}`);
 
   // Índices para armar cada celda rápido
-  const baseDe = new Map((horarios ?? []).map((h) => [`${h.usuario_id}|${h.dia_semana}`, h]));
+  const baseDe = new Map<string, NonNullable<typeof horarios>>();
+  for (const h of horarios ?? []) baseDe.set(h.usuario_id, [...(baseDe.get(h.usuario_id) ?? []), h]);
   const turnoDe = new Map((turnos ?? []).map((t) => [`${t.usuario_id}|${t.fecha}`, t]));
 
   const filas = (personas ?? []).map((p) => {
-    const celdas: CeldaDia[] = fechas.map((fecha, i) => {
-      const b = baseDe.get(`${p.id}|${i + 1}`);
+    const celdas: CeldaDia[] = fechas.map((fecha) => {
+      // Horario base de esa fecha (considera la semana A/B del ciclo)
+      const b = horarioEfectivo({
+        fecha,
+        base: baseDe.get(p.id) ?? [],
+        turno: null,
+        cicloSemanas: p.ciclo_semanas,
+        cicloInicio: p.ciclo_inicio,
+      });
       const t = turnoDe.get(`${p.id}|${fecha}`);
-      const base = b ? { entrada: hhmm(b.hora_entrada), salida: hhmm(b.hora_salida) } : null;
+      const base = b.tipo === "trabajo" ? { entrada: b.entrada, salida: b.salida } : null;
 
       let efectivo: CeldaDia["efectivo"];
       if (t) {
@@ -61,7 +85,8 @@ export default async function TurnosPage({ searchParams }: Props) {
       }
       return { fecha, base, efectivo };
     });
-    return { ...p, celdas };
+    const semana = semanaDelCiclo(fechas[0], p.ciclo_inicio, p.ciclo_semanas ?? 1);
+    return { ...p, celdas, semana: (p.ciclo_semanas ?? 1) > 1 ? letraSemana(semana) : null };
   });
 
   return (
@@ -72,7 +97,8 @@ export default async function TurnosPage({ searchParams }: Props) {
             <CalendarDays className="size-6 text-sky-600" aria-hidden /> Turnos semanales
           </h1>
           <p className="text-sm text-slate-500">
-            Ajusta los días que cambian. Lo que no toques usa el horario base de cada persona.
+            Los turnos rotativos (Semana A / B) ya se aplican solos. Aquí solo ajustas cambios
+            puntuales: un día distinto, un reemplazo o un día libre.
           </p>
         </div>
         <CopiarSemana lunes={lunes} />
@@ -140,6 +166,7 @@ export default async function TurnosPage({ searchParams }: Props) {
                   usuarioId={p.id}
                   nombre={p.nombre}
                   cargo={p.cargo}
+                  semana={p.semana}
                   lunes={lunes}
                   celdas={p.celdas}
                 />

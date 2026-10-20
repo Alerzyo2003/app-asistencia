@@ -18,7 +18,15 @@ import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { adminParaAccion } from "@/lib/auth";
 import { esRutValido, formatearRut } from "@/lib/rut";
-import { DIAS, validarDia, type DiaHorario } from "@/lib/horarios";
+import {
+  DIAS,
+  MAX_SEMANAS_CICLO,
+  esFecha,
+  letraSemana,
+  lunesDe,
+  validarDia,
+  type DiaHorario,
+} from "@/lib/horarios";
 import { PREFIJO_CORREO_INTERNO, esUsuarioValido, normalizarUsuario } from "@/lib/usuario";
 
 export type EstadoAccion = { ok: boolean; mensaje: string } | null;
@@ -260,57 +268,74 @@ export async function guardarHorario(_prev: EstadoAccion, fd: FormData): Promise
   const id = texto(fd, "id", 40);
   if (!RE_UUID.test(id)) return { ok: false, mensaje: "Persona no válida." };
 
-  // Leer los 7 días del formulario: trabaja_N, entrada_N, salida_N, tolerancia_N
-  const dias: DiaHorario[] = [];
-  for (const { n } of DIAS) {
-    if (fd.get(`trabaja_${n}`) !== "on") continue;
-    const dia: DiaHorario = {
-      dia_semana: n,
-      hora_entrada: texto(fd, `entrada_${n}`, 5),
-      hora_salida: texto(fd, `salida_${n}`, 5),
-      tolerancia_minutos: Number(fd.get(`tolerancia_${n}`) ?? 0),
-    };
-    const error = validarDia(dia);
-    if (error) return { ok: false, mensaje: error };
-    dias.push(dia);
+  // Ciclo: 1 = siempre igual; 2–4 = semanas A/B/C/D intercaladas
+  const ciclo = Number(fd.get("ciclo_semanas") ?? 1);
+  if (!Number.isInteger(ciclo) || ciclo < 1 || ciclo > MAX_SEMANAS_CICLO) {
+    return { ok: false, mensaje: "Ciclo no válido." };
+  }
+  const inicioCrudo = texto(fd, "ciclo_inicio", 10);
+  if (ciclo > 1 && !esFecha(inicioCrudo)) {
+    return { ok: false, mensaje: "Indica el lunes en que comienza la Semana A." };
+  }
+  // Se guarda siempre el lunes de esa semana
+  const inicio = ciclo > 1 ? lunesDe(inicioCrudo) : null;
+
+  // Leer cada semana: trabaja_S_N, entrada_S_N, salida_S_N, tolerancia_S_N
+  const filas: (DiaHorario & { semana_ciclo: number })[] = [];
+  for (let s = 1; s <= ciclo; s++) {
+    for (const { n } of DIAS) {
+      if (fd.get(`trabaja_${s}_${n}`) !== "on") continue;
+      const dia: DiaHorario = {
+        dia_semana: n,
+        hora_entrada: texto(fd, `entrada_${s}_${n}`, 5),
+        hora_salida: texto(fd, `salida_${s}_${n}`, 5),
+        tolerancia_minutos: Number(fd.get(`tolerancia_${s}_${n}`) ?? 0),
+      };
+      const error = validarDia(dia);
+      if (error) return { ok: false, mensaje: ciclo > 1 ? `Semana ${letraSemana(s)} · ${error}` : error };
+      filas.push({ ...dia, semana_ciclo: s });
+    }
   }
 
   const admin = createAdminClient();
 
-  // 1. Insertar/actualizar los días que trabaja.
-  if (dias.length) {
-    const { error } = await admin
-      .from("horarios")
-      .upsert(
-        dias.map((d) => ({ usuario_id: id, ...d })),
-        { onConflict: "usuario_id,dia_semana" },
-      );
-    if (error) {
-      console.error("[personal] horario upsert", error);
-      return { ok: false, mensaje: "No se pudo guardar el horario." };
-    }
+  // 1. Guardar el ciclo de la persona
+  const { error: errorCiclo } = await admin
+    .from("usuarios")
+    .update({ ciclo_semanas: ciclo, ciclo_inicio: inicio })
+    .eq("id", id);
+  if (errorCiclo) {
+    console.error("[personal] ciclo", errorCiclo);
+    return { ok: false, mensaje: "No se pudo guardar el ciclo de turnos." };
   }
 
-  // 2. Borrar los días que ya no trabaja.
-  const diasLibres = DIAS.map((d) => d.n).filter((n) => !dias.some((d) => d.dia_semana === n));
-  if (diasLibres.length) {
-    const { error } = await admin
-      .from("horarios")
-      .delete()
-      .eq("usuario_id", id)
-      .in("dia_semana", diasLibres);
+  // 2. Reemplazar el horario base completo (son pocas filas: borrar e insertar)
+  const { error: errorBorrar } = await admin.from("horarios").delete().eq("usuario_id", id);
+  if (errorBorrar) {
+    console.error("[personal] horario delete", errorBorrar);
+    return { ok: false, mensaje: "No se pudo actualizar el horario." };
+  }
+
+  if (filas.length) {
+    const { error } = await admin.from("horarios").insert(filas.map((f) => ({ usuario_id: id, ...f })));
     if (error) {
-      console.error("[personal] horario delete", error);
-      return { ok: false, mensaje: "No se pudieron quitar los días libres." };
+      console.error("[personal] horario insert", error);
+      return { ok: false, mensaje: "No se pudo guardar el horario. Vuelve a intentarlo." };
     }
   }
 
   revalidatePath("/admin/personal");
   revalidatePath(`/admin/personal/${id}`);
+  revalidatePath("/admin/turnos");
+
+  if (!filas.length) {
+    return { ok: true, mensaje: "Horario borrado: la persona no tiene días asignados." };
+  }
   return {
     ok: true,
-    mensaje: dias.length
-      ? "Horario base guardado."
-      : "Horario base borrado: la persona no tiene días asignados.",
+    mensaje:
+      ciclo > 1
+        ? `Horario guardado: ${ciclo} semanas que se alternan desde el lunes ${inicio!.split("-").reverse().join("-")}.`
+        : "Horario guardado.",
   };
 }

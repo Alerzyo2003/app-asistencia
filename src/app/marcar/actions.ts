@@ -34,9 +34,11 @@ import {
   fechaHoy,
   siguientesPermitidos,
   type ResultadoMarcaje,
+  type ResultadoPuntualidad,
   type TipoRegistro,
 } from "@/lib/asistencia";
 import { BUCKET_FOTOS } from "@/lib/fotos";
+import { desvio, horarioDelDia } from "@/lib/horario-servidor";
 
 /** Lee un número del FormData; null si viene vacío o no es número. */
 function numero(fd: FormData, campo: string): number | null {
@@ -194,10 +196,29 @@ export async function registrarMarcaje(fd: FormData): Promise<ResultadoMarcaje> 
     ? `${ETIQUETAS[tipo]} registrada a las ${hora}${fotoPath ? " con foto" : ""}.`
     : `${ETIQUETAS[tipo]} registrada a las ${hora}, pero quedó en revisión: ${motivo}`;
 
+  // ¿A tiempo o con atraso / salida anticipada? (según su turno de hoy)
+  const horario = await horarioDelDia(admin, user.id, hoy);
+  const minutos = desvio(tipo, hora, horario);
+  let puntualidad: ResultadoPuntualidad = null;
+  if (minutos !== null && horario?.tipo === "trabajo") {
+    const referencia = tipo === "entrada" ? horario.entrada : horario.salida;
+    puntualidad =
+      minutos === 0
+        ? { aTiempo: true, texto: tipo === "entrada" ? `A tiempo (tu entrada: ${referencia})` : `Salida a tiempo (tu salida: ${referencia})` }
+        : {
+            aTiempo: false,
+            texto:
+              tipo === "entrada"
+                ? `Atraso de ${minutos} min (tu entrada: ${referencia})`
+                : `Saliste ${minutos} min antes (tu salida: ${referencia})`,
+          };
+  }
+
   return {
     ok: true,
     valida,
     marcadoEn: insertada.marcado_en,
     mensaje: avisoFoto ? `${base} ${avisoFoto}` : base,
+    puntualidad,
   };
 }

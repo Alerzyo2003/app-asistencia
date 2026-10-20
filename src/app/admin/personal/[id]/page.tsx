@@ -7,9 +7,11 @@ import { ArrowLeft, CalendarClock, ShieldCheck, UserRound } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
 import { requerirAdmin } from "@/lib/auth";
-import type { DiaHorario } from "@/lib/horarios";
+import { lunesDe } from "@/lib/horarios";
+import { fechaHoy } from "@/lib/asistencia";
+import { ZONA_HORARIA } from "@/lib/config";
 import { PerfilForm, type DatosPerfil } from "./PerfilForm";
-import { HorarioForm } from "./HorarioForm";
+import { HorarioForm, type HorarioCiclo } from "./HorarioForm";
 import { AccesoForm } from "./AccesoForm";
 import { tarjeta } from "../../estilos";
 
@@ -31,21 +33,23 @@ export default async function FichaPersonaPage({ params, searchParams }: Props) 
   const [{ data: persona }, { data: horarios }] = await Promise.all([
     supabase
       .from("usuarios")
-      .select("id, nombre, usuario, rut, email, cargo, rol, activo")
+      .select("id, nombre, usuario, rut, email, cargo, rol, activo, ciclo_semanas, ciclo_inicio")
       .eq("id", id)
       .maybeSingle(),
     supabase
       .from("horarios")
-      .select("dia_semana, hora_entrada, hora_salida, tolerancia_minutos")
+      .select("semana_ciclo, dia_semana, hora_entrada, hora_salida, tolerancia_minutos")
       .eq("usuario_id", id)
+      .order("semana_ciclo")
       .order("dia_semana"),
   ]);
 
   if (!persona) notFound();
 
   const esUnoMismo = yo.id === persona.id;
+  const hoy = fechaHoy(ZONA_HORARIA);
   // Postgres devuelve "08:30:00"; el input type="time" usa "08:30".
-  const horarioActual: DiaHorario[] = (horarios ?? []).map((h) => ({
+  const horarioActual: HorarioCiclo[] = (horarios ?? []).map((h) => ({
     ...h,
     hora_entrada: h.hora_entrada.slice(0, 5),
     hora_salida: h.hora_salida.slice(0, 5),
@@ -83,9 +87,16 @@ export default async function FichaPersonaPage({ params, searchParams }: Props) 
 
       <section className={tarjeta}>
         <h2 className="mb-4 flex items-center gap-2 font-semibold">
-          <CalendarClock className="size-5 text-sky-600" aria-hidden /> Horario base semanal
+          <CalendarClock className="size-5 text-sky-600" aria-hidden /> Horario y turnos
         </h2>
-        <HorarioForm usuarioId={persona.id} actual={horarioActual} />
+        <HorarioForm
+          usuarioId={persona.id}
+          actual={horarioActual}
+          cicloSemanas={persona.ciclo_semanas ?? 1}
+          cicloInicio={persona.ciclo_inicio}
+          hoy={hoy}
+          lunesActual={lunesDe(hoy)}
+        />
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">

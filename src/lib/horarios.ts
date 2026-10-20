@@ -112,3 +112,107 @@ export function fechasSemana(lunes: string): string[] {
 export function diaMes(fecha: string): string {
   return `${fecha.slice(8, 10)}/${fecha.slice(5, 7)}`;
 }
+
+// ---------------------------------------------------------------------------
+// Horarios rotativos (Semana A / B / C / D)
+// ---------------------------------------------------------------------------
+
+export const MAX_SEMANAS_CICLO = 4;
+export const LETRAS_SEMANA = ["A", "B", "C", "D"] as const;
+
+/**
+ * Semana del ciclo (1 = A, 2 = B…) que corresponde a `fecha`, dado el lunes
+ * en que empieza la Semana A y el largo del ciclo. Misma regla que la función
+ * SQL public.semana_del_ciclo().
+ */
+export function semanaDelCiclo(fecha: string, inicio: string | null, semanas: number): number {
+  if (!inicio || semanas <= 1) return 1;
+  const ms = Date.parse(`${lunesDe(fecha)}T00:00:00Z`) - Date.parse(`${lunesDe(inicio)}T00:00:00Z`);
+  const diff = Math.round(ms / (7 * 86_400_000));
+  return (((diff % semanas) + semanas) % semanas) + 1;
+}
+
+export const letraSemana = (n: number) => LETRAS_SEMANA[n - 1] ?? String(n);
+
+// ---------------------------------------------------------------------------
+// Horario efectivo de una persona en una fecha
+// ---------------------------------------------------------------------------
+
+export type FilaHorarioBase = {
+  semana_ciclo?: number | null;
+  dia_semana: number;
+  hora_entrada: string; // "08:30" o "08:30:00"
+  hora_salida: string;
+  tolerancia_minutos: number;
+};
+
+export type FilaTurno = {
+  libre: boolean;
+  hora_entrada: string | null;
+  hora_salida: string | null;
+  tolerancia_minutos: number | null;
+};
+
+export type HorarioEfectivo =
+  | {
+      tipo: "trabajo";
+      entrada: string; // "HH:MM"
+      salida: string;
+      tolerancia: number;
+      origen: "turno" | "base";
+      semana: number; // semana del ciclo (1 = A)
+    }
+  | { tipo: "libre"; origen: "turno" | "base"; semana: number }
+  | { tipo: "ninguno"; semana: number };
+
+const hhmm = (t: string) => t.slice(0, 5);
+
+export function isoDiaSemana(fecha: string): number {
+  const d = new Date(`${fecha}T00:00:00Z`).getUTCDay();
+  return d === 0 ? 7 : d;
+}
+
+/**
+ * Qué horario le toca a una persona en `fecha`:
+ *  1. Si hay un turno puntual para esa fecha, manda el turno.
+ *  2. Si no, el horario base de la semana del ciclo que corresponda.
+ *  3. Si su base tiene días pero ese día no, es libre; si no tiene nada, "ninguno".
+ */
+export function horarioEfectivo(params: {
+  fecha: string;
+  base: FilaHorarioBase[]; // solo los de esa persona
+  turno: FilaTurno | null | undefined;
+  cicloSemanas: number | null | undefined;
+  cicloInicio: string | null | undefined;
+}): HorarioEfectivo {
+  const { fecha, base, turno } = params;
+  const semana = semanaDelCiclo(fecha, params.cicloInicio ?? null, params.cicloSemanas ?? 1);
+
+  if (turno) {
+    if (turno.libre || !turno.hora_entrada || !turno.hora_salida) {
+      return { tipo: "libre", origen: "turno", semana };
+    }
+    return {
+      tipo: "trabajo",
+      entrada: hhmm(turno.hora_entrada),
+      salida: hhmm(turno.hora_salida),
+      tolerancia: turno.tolerancia_minutos ?? TOLERANCIA_POR_DEFECTO,
+      origen: "turno",
+      semana,
+    };
+  }
+
+  const dow = isoDiaSemana(fecha);
+  const b = base.find((h) => (h.semana_ciclo ?? 1) === semana && h.dia_semana === dow);
+  if (b) {
+    return {
+      tipo: "trabajo",
+      entrada: hhmm(b.hora_entrada),
+      salida: hhmm(b.hora_salida),
+      tolerancia: b.tolerancia_minutos ?? TOLERANCIA_POR_DEFECTO,
+      origen: "base",
+      semana,
+    };
+  }
+  return base.length ? { tipo: "libre", origen: "base", semana } : { tipo: "ninguno", semana };
+}

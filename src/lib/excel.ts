@@ -86,6 +86,14 @@ const horasTexto = (min: number) => `${Math.floor(min / 60)}:${String(Math.abs(m
 
 const pct = (parte: number, total: number) => (total > 0 ? parte / total : null);
 
+/** "08:30–14:00 · Sem. A" / "10:00–19:00 (turno)" */
+const textoHorario = (d: FilaDia) =>
+  d.origenHorario === "turno"
+    ? `${d.horario}  (cambio)`
+    : d.semanaCiclo
+      ? `${d.horario}  · Sem. ${d.semanaCiclo}`
+      : d.horario;
+
 /** Nivel de color para un % de puntualidad. */
 const nivelPuntualidad = (p: number | null): Nivel =>
   p === null ? "neutro" : p >= 0.9 ? "ok" : p >= 0.7 ? "alerta" : "falta";
@@ -496,7 +504,7 @@ function hojaIncidencias(wb: ExcelJS.Workbook, resumenes: ResumenPersona[], hoja
     { t: "Día", w: 11 },
     { t: "Persona", w: 26 },
     { t: "Incidencia", w: 32 },
-    { t: "Horario", w: 18 },
+    { t: "Horario", w: 22 },
     { t: "Entrada", w: 9 },
     { t: "Salida", w: 9 },
     { t: "Observaciones", w: 50 },
@@ -549,7 +557,7 @@ function hojaIncidencias(wb: ExcelJS.Workbook, resumenes: ResumenPersona[], hoja
       d.diaSemana,
       { text: persona, hyperlink: `#'${hoja}'!A1` },
       `${NIVEL[d.nivel].icono}  ${d.estado}`,
-      d.horario,
+      textoHorario(d),
       d.entrada ?? "—",
       d.salida ?? "—",
       d.observaciones,
@@ -573,7 +581,7 @@ function hojaPersona(wb: ExcelJS.Workbook, nombre: string, r: ResumenPersona, me
   const cols = [
     { t: "Fecha", w: 12 },
     { t: "Día", w: 11 },
-    { t: "Horario", w: 19 },
+    { t: "Horario", w: 22 },
     { t: "Entrada", w: 9 },
     { t: "Salida", w: 9 },
     { t: "Atraso", w: 9 },
@@ -643,7 +651,7 @@ function hojaPersona(wb: ExcelJS.Workbook, nombre: string, r: ResumenPersona, me
     const f = ws.addRow([
       fechaExcel(d.fecha),
       d.diaSemana,
-      d.origenHorario === "turno" ? `${d.horario}  (turno)` : d.horario,
+      textoHorario(d),
       d.entrada ?? "—",
       d.salida ?? "—",
       d.minutosAtraso,

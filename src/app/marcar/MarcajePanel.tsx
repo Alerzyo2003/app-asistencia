@@ -16,6 +16,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import {
+  CalendarClock,
   Camera,
   CheckCircle2,
   Clock,
@@ -24,6 +25,7 @@ import {
   LogIn,
   LogOut,
   MapPin,
+  Timer,
   TriangleAlert,
   X,
   XCircle,
@@ -98,9 +100,12 @@ function leerUbicacion(): Promise<LecturaNavegador> {
 export function MarcajePanel({
   nombre,
   marcasHoy,
+  horarioHoy,
 }: {
   nombre: string;
   marcasHoy: Marcacion[];
+  /** "08:30 a 14:00 · Semana A", "Hoy no tienes turno" o null si no tiene horario */
+  horarioHoy: string | null;
 }) {
   const [fase, setFase] = useState<Fase>("libre");
   const [tipoActivo, setTipoActivo] = useState<TipoEvento | null>(null);
@@ -181,6 +186,12 @@ export function MarcajePanel({
           </form>
         </div>
         <Reloj />
+        {horarioHoy && (
+          <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-3 py-1 text-sm font-medium text-sky-800 ring-1 ring-sky-200">
+            <CalendarClock className="size-4" aria-hidden />
+            {horarioHoy.startsWith("Hoy") ? horarioHoy : `Tu horario hoy: ${horarioHoy}`}
+          </p>
+        )}
       </header>
 
       {/* Foto opcional */}
@@ -271,6 +282,14 @@ export function MarcajePanel({
             tono={!resultado.ok ? "error" : resultado.valida ? "ok" : "alerta"}
           >
             {resultado.mensaje}
+          </Aviso>
+        )}
+        {resultado?.ok && resultado.puntualidad && (
+          <Aviso
+            icono={resultado.puntualidad.aTiempo ? Timer : TriangleAlert}
+            tono={resultado.puntualidad.aTiempo ? "ok" : "alerta"}
+          >
+            <strong>{resultado.puntualidad.texto}</strong>
           </Aviso>
         )}
       </div>

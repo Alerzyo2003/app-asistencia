@@ -6,7 +6,7 @@
  * Es lógica pura (sin Supabase ni Excel) para poder probarla fácilmente.
  */
 
-import { DIAS, aMinutos, sumarDias, TOLERANCIA_POR_DEFECTO } from "./horarios";
+import { DIAS, aMinutos, horarioEfectivo, isoDiaSemana, letraSemana, sumarDias } from "./horarios";
 
 const ZONA = "America/Santiago";
 
@@ -14,7 +14,14 @@ const ZONA = "America/Santiago";
 // Entradas
 // ---------------------------------------------------------------------------
 
-export type PersonaReporte = { id: string; nombre: string; rut: string | null; cargo: string | null };
+export type PersonaReporte = {
+  id: string;
+  nombre: string;
+  rut: string | null;
+  cargo: string | null;
+  ciclo_semanas?: number | null;
+  ciclo_inicio?: string | null;
+};
 
 export type JornadaVista = {
   usuario_id: string;
@@ -27,6 +34,7 @@ export type JornadaVista = {
 
 export type HorarioBase = {
   usuario_id: string;
+  semana_ciclo?: number | null;
   dia_semana: number;
   hora_entrada: string;
   hora_salida: string;
@@ -61,6 +69,8 @@ export type FilaDia = {
   diaSemana: string; // "Lunes"
   horario: string; // "08:30–17:30" | "Libre" | "Sin horario"
   origenHorario: "turno" | "base" | "libre" | "ninguno";
+  /** "A", "B"… si la persona tiene turnos rotativos; null si no */
+  semanaCiclo: string | null;
   entrada: string | null; // "08:42"
   salida: string | null;
   minutosPactados: number | null;
@@ -98,18 +108,6 @@ const fmtHora = new Intl.DateTimeFormat("es-CL", {
 });
 
 const horaLocal = (iso: string | null) => (iso ? fmtHora.format(new Date(iso)) : null);
-const hhmm = (t: string | null) => (t ? t.slice(0, 5) : null);
-
-function isoDow(fecha: string): number {
-  const d = new Date(`${fecha}T00:00:00Z`).getUTCDay();
-  return d === 0 ? 7 : d;
-}
-
-type Esperado =
-  | { tipo: "trabajo"; entrada: string; salida: string; tolerancia: number; origen: "turno" | "base" }
-  | { tipo: "libre" }
-  | { tipo: "ninguno" };
-
 export function calcularReporte(params: {
   personas: PersonaReporte[];
   jornadas: JornadaVista[];
@@ -123,8 +121,9 @@ export function calcularReporte(params: {
   const { personas, jornadas, horarios, turnos, observadas, desde, hasta, hoy } = params;
 
   const jornadaDe = new Map(jornadas.map((j) => [`${j.usuario_id}|${j.fecha}`, j]));
-  const baseDe = new Map(horarios.map((h) => [`${h.usuario_id}|${h.dia_semana}`, h]));
   const turnoDe = new Map(turnos.map((t) => [`${t.usuario_id}|${t.fecha}`, t]));
+  const baseDe = new Map<string, HorarioBase[]>();
+  for (const h of horarios) baseDe.set(h.usuario_id, [...(baseDe.get(h.usuario_id) ?? []), h]);
   const obsDe = new Map<string, string[]>();
   for (const o of observadas) {
     const k = `${o.usuario_id}|${o.fecha}`;
@@ -132,30 +131,14 @@ export function calcularReporte(params: {
     obsDe.set(k, [...(obsDe.get(k) ?? []), `${etiqueta} en revisión: ${o.motivo_observacion ?? "sin detalle"}`]);
   }
 
-  function esperado(usuarioId: string, fecha: string): Esperado {
-    const t = turnoDe.get(`${usuarioId}|${fecha}`);
-    if (t) {
-      if (t.libre || !t.hora_entrada || !t.hora_salida) return { tipo: "libre" };
-      return {
-        tipo: "trabajo",
-        entrada: hhmm(t.hora_entrada)!,
-        salida: hhmm(t.hora_salida)!,
-        tolerancia: t.tolerancia_minutos ?? TOLERANCIA_POR_DEFECTO,
-        origen: "turno",
-      };
-    }
-    const b = baseDe.get(`${usuarioId}|${isoDow(fecha)}`);
-    if (b) {
-      return {
-        tipo: "trabajo",
-        entrada: hhmm(b.hora_entrada)!,
-        salida: hhmm(b.hora_salida)!,
-        tolerancia: b.tolerancia_minutos ?? TOLERANCIA_POR_DEFECTO,
-        origen: "base",
-      };
-    }
-    return { tipo: "ninguno" };
-  }
+  const esperado = (persona: PersonaReporte, fecha: string) =>
+    horarioEfectivo({
+      fecha,
+      base: baseDe.get(persona.id) ?? [],
+      turno: turnoDe.get(`${persona.id}|${fecha}`),
+      cicloSemanas: persona.ciclo_semanas,
+      cicloInicio: persona.ciclo_inicio,
+    });
 
   // Fechas del período (sin pasar de hoy: el futuro aún no ocurre)
   const fechas: string[] = [];
@@ -167,7 +150,7 @@ export function calcularReporte(params: {
 
     for (const fecha of fechas) {
       const j = jornadaDe.get(`${persona.id}|${fecha}`);
-      const e = esperado(persona.id, fecha);
+      const e = esperado(persona, fecha);
 
       // Días sin marcas: solo se listan si tocaba trabajar (= ausencia) y ya pasaron
       if (!j && (e.tipo !== "trabajo" || fecha >= hoy)) continue;
@@ -178,9 +161,10 @@ export function calcularReporte(params: {
 
       const fila: FilaDia = {
         fecha,
-        diaSemana: DIAS[isoDow(fecha) - 1].nombre,
+        diaSemana: DIAS[isoDiaSemana(fecha) - 1].nombre,
         horario,
         origenHorario: e.tipo === "trabajo" ? e.origen : e.tipo,
+        semanaCiclo: (persona.ciclo_semanas ?? 1) > 1 ? letraSemana(e.semana) : null,
         entrada: horaLocal(j?.entrada ?? null),
         salida: horaLocal(j?.salida ?? null),
         minutosPactados,

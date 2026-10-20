@@ -101,10 +101,13 @@ async function generarReporte(
   // las que están en revisión se muestran en "Observaciones".
   const filtrosTodas = { ...filtros, estado: "todas" as const };
 
-  let qPersonas = supabase.from("usuarios").select("id, nombre, rut, cargo, activo").order("nombre");
+  let qPersonas = supabase
+    .from("usuarios")
+    .select("id, nombre, rut, cargo, activo, ciclo_semanas, ciclo_inicio")
+    .order("nombre");
   let qHorarios = supabase
     .from("horarios")
-    .select("usuario_id, dia_semana, hora_entrada, hora_salida, tolerancia_minutos");
+    .select("usuario_id, semana_ciclo, dia_semana, hora_entrada, hora_salida, tolerancia_minutos");
   let qTurnos = supabase
     .from("turnos")
     .select("usuario_id, fecha, libre, hora_entrada, hora_salida, tolerancia_minutos")
@@ -141,7 +144,14 @@ async function generarReporte(
   const conMarcas = new Set(jornadas.map((j) => j.usuario_id));
   const lista: PersonaReporte[] = (personas.data ?? [])
     .filter((p) => p.activo || conMarcas.has(p.id))
-    .map(({ id, nombre, rut, cargo }) => ({ id, nombre, rut, cargo }));
+    .map(({ id, nombre, rut, cargo, ciclo_semanas, ciclo_inicio }) => ({
+      id,
+      nombre,
+      rut,
+      cargo,
+      ciclo_semanas,
+      ciclo_inicio,
+    }));
 
   const resumenes = calcularReporte({
     personas: lista,

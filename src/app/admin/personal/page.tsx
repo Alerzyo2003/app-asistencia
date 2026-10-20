@@ -5,7 +5,15 @@ import Link from "next/link";
 import { ChevronRight, UserPlus } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
-import { DIAS, minutosSemana, type DiaHorario } from "@/lib/horarios";
+import {
+  DIAS,
+  letraSemana,
+  minutosSemana,
+  semanaDelCiclo,
+  type DiaHorario,
+} from "@/lib/horarios";
+import { fechaHoy } from "@/lib/asistencia";
+import { ZONA_HORARIA } from "@/lib/config";
 import { duracion } from "@/lib/formato";
 import { NuevaPersonaForm } from "./NuevaPersonaForm";
 import { tarjeta } from "../estilos";
@@ -19,7 +27,9 @@ type FilaPersona = {
   cargo: string | null;
   rol: "admin" | "empleado";
   activo: boolean;
-  horarios: DiaHorario[];
+  ciclo_semanas: number;
+  ciclo_inicio: string | null;
+  horarios: (DiaHorario & { semana_ciclo: number })[];
 };
 
 export default async function PersonalPage() {
@@ -27,7 +37,7 @@ export default async function PersonalPage() {
   const { data, error } = await supabase
     .from("usuarios")
     .select(
-      "id, nombre, usuario, rut, email, cargo, rol, activo, horarios(dia_semana, hora_entrada, hora_salida, tolerancia_minutos)",
+      "id, nombre, usuario, rut, email, cargo, rol, activo, ciclo_semanas, ciclo_inicio, horarios(semana_ciclo, dia_semana, hora_entrada, hora_salida, tolerancia_minutos)",
     )
     .order("activo", { ascending: false })
     .order("nombre");
@@ -35,6 +45,13 @@ export default async function PersonalPage() {
   if (error) throw new Error(`No se pudo cargar el personal: ${error.message}`);
   const personas = (data ?? []) as FilaPersona[];
   const sinHorario = personas.filter((p) => p.activo && p.horarios.length === 0).length;
+  const hoy = fechaHoy(ZONA_HORARIA);
+
+  /** Horario de la semana que le toca hoy (A, B…) para calcular las horas. */
+  const horariosSemana = (p: FilaPersona) => {
+    const s = semanaDelCiclo(hoy, p.ciclo_inicio, p.ciclo_semanas);
+    return p.horarios.filter((h) => (h.semana_ciclo ?? 1) === s);
+  };
 
   return (
     <div className="space-y-6">
@@ -54,14 +71,14 @@ export default async function PersonalPage() {
               <th className="px-4 py-3">Persona</th>
               <th className="px-4 py-3">Cargo</th>
               <th className="px-4 py-3">Días</th>
-              <th className="px-4 py-3 text-right">Horas semana</th>
+              <th className="px-4 py-3 text-right">Horas esta semana</th>
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {personas.map((p) => {
-              const diasTrabajo = new Set(p.horarios.map((h) => h.dia_semana));
+              const diasTrabajo = new Set(horariosSemana(p).map((h) => h.dia_semana));
               return (
                 <tr key={p.id} className={p.activo ? "" : "text-slate-400"}>
                   <td className="px-4 py-3">
@@ -82,6 +99,15 @@ export default async function PersonalPage() {
                   <td className="px-4 py-3">
                     {p.horarios.length === 0 ? (
                       <span className="text-amber-700">Sin horario</span>
+                    ) : p.ciclo_semanas > 1 ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="rounded bg-violet-100 px-1.5 py-0.5 text-xs font-medium text-violet-700">
+                          Rotativo {p.ciclo_semanas} sem.
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          esta semana: {letraSemana(semanaDelCiclo(hoy, p.ciclo_inicio, p.ciclo_semanas))}
+                        </span>
+                      </span>
                     ) : (
                       <span className="flex gap-1">
                         {DIAS.map((d) => (
@@ -104,7 +130,7 @@ export default async function PersonalPage() {
                     {p.horarios.length
                       ? duracion(
                           minutosSemana(
-                            p.horarios.map((h) => ({
+                            horariosSemana(p).map((h) => ({
                               ...h,
                               hora_entrada: h.hora_entrada.slice(0, 5),
                               hora_salida: h.hora_salida.slice(0, 5),

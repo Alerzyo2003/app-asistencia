@@ -41,12 +41,16 @@ export type Marcacion = {
   foto_path: string | null;
 };
 
+/** Comparación con el horario del día (null si no tenía horario). */
+export type ResultadoPuntualidad = { aTiempo: boolean; texto: string } | null;
+
 export type ResultadoMarcaje =
   | {
       ok: true;
       valida: boolean;
       mensaje: string;
       marcadoEn: string;
+      puntualidad: ResultadoPuntualidad;
     }
   | {
       ok: false;

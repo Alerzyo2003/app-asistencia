@@ -51,12 +51,14 @@ export function FilaSemana({
   usuarioId,
   nombre,
   cargo,
+  semana,
   lunes,
   celdas,
 }: {
   usuarioId: string;
   nombre: string;
   cargo: string | null;
+  semana: string | null;
   lunes: string;
   celdas: CeldaDia[];
 }) {
@@ -83,6 +85,11 @@ export function FilaSemana({
       <td className="sticky left-0 z-[1] bg-white px-3 py-3">
         <p className="font-medium text-slate-900">{nombre}</p>
         {cargo && <p className="text-xs text-slate-500">{cargo}</p>}
+        {semana && (
+          <span className="mt-1 inline-block rounded bg-violet-100 px-1.5 py-0.5 text-xs font-medium text-violet-700">
+            Semana {semana}
+          </span>
+        )}
         <p className="mt-1 text-xs tabular-nums text-slate-500">{duracion(total)} / semana</p>
       </td>
 
