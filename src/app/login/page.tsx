@@ -21,11 +21,15 @@ export default function LoginPage() {
         </header>
 
         <label className="block space-y-1.5">
-          <span className="text-sm font-medium text-slate-700">Correo</span>
+          <span className="text-sm font-medium text-slate-700">Usuario</span>
           <input
-            name="email"
-            type="email"
-            autoComplete="email"
+            name="usuario"
+            type="text"
+            placeholder="ej. jorgeopazo"
+            autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             required
             className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-base outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
           />

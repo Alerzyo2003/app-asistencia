@@ -19,6 +19,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { adminParaAccion } from "@/lib/auth";
 import { esRutValido, formatearRut } from "@/lib/rut";
 import { DIAS, validarDia, type DiaHorario } from "@/lib/horarios";
+import { PREFIJO_CORREO_INTERNO, esUsuarioValido, normalizarUsuario } from "@/lib/usuario";
 
 export type EstadoAccion = { ok: boolean; mensaje: string } | null;
 
@@ -29,6 +30,11 @@ const BLOQUEO_INDEFINIDO = "876000h";
 
 const NO_AUTORIZADO: EstadoAccion = { ok: false, mensaje: "No tienes permisos para esto." };
 
+/** Dominio de los correos internos (para quien no tiene correo). */
+const DOMINIO_INTERNO = process.env.AUTH_DOMINIO_INTERNO || "clinicadignidad.com";
+const MSJ_USUARIO =
+  "El usuario debe tener entre 3 y 30 caracteres: minúsculas, números, punto, guion o guion bajo (sin espacios ni tildes).";
+
 function texto(fd: FormData, campo: string, max = 120): string {
   return String(fd.get(campo) ?? "").trim().slice(0, max);
 }
@@ -36,19 +42,28 @@ function texto(fd: FormData, campo: string, max = 120): string {
 /** Valida y normaliza los campos comunes del perfil. */
 function leerPerfil(fd: FormData):
   | { error: string }
-  | { nombre: string; rut: string | null; cargo: string | null; rol: "admin" | "empleado" } {
+  | {
+      nombre: string;
+      usuario: string;
+      rut: string | null;
+      cargo: string | null;
+      rol: "admin" | "empleado";
+    } {
   const nombre = texto(fd, "nombre");
+  const usuario = normalizarUsuario(texto(fd, "usuario", 40));
   const rutCrudo = texto(fd, "rut", 20);
   const cargo = texto(fd, "cargo", 60) || null;
   const rol = fd.get("rol") === "admin" ? "admin" : "empleado";
 
   if (nombre.length < 3) return { error: "Escribe el nombre completo." };
+  if (!esUsuarioValido(usuario)) return { error: MSJ_USUARIO };
   if (rutCrudo && !esRutValido(rutCrudo)) return { error: "El RUT no es válido." };
 
-  return { nombre, rut: rutCrudo ? formatearRut(rutCrudo) : null, cargo, rol };
+  return { nombre, usuario, rut: rutCrudo ? formatearRut(rutCrudo) : null, cargo, rol };
 }
 
 function errorUnico(mensaje: string | undefined): string {
+  if (mensaje?.includes("usuario")) return "Ese usuario ya está en uso. Elige otro.";
   return mensaje?.includes("rut") ? "Ese RUT ya está registrado." : "No se pudo guardar.";
 }
 
@@ -62,17 +77,27 @@ export async function crearPersona(_prev: EstadoAccion, fd: FormData): Promise<E
   const perfil = leerPerfil(fd);
   if ("error" in perfil) return { ok: false, mensaje: perfil.error };
 
-  const email = texto(fd, "email").toLowerCase();
+  const correo = texto(fd, "email").toLowerCase();
   const password = String(fd.get("password") ?? "");
 
-  if (!RE_EMAIL.test(email)) return { ok: false, mensaje: "El correo no es válido." };
+  // El correo es opcional. Sin correo se usa uno interno que nunca recibe nada.
+  if (correo && !RE_EMAIL.test(correo)) return { ok: false, mensaje: "El correo no es válido." };
+  const email = correo || `${PREFIJO_CORREO_INTERNO}${perfil.usuario}@${DOMINIO_INTERNO}`;
   if (password.length < 8) {
     return { ok: false, mensaje: "La contraseña debe tener al menos 8 caracteres." };
   }
 
   const admin = createAdminClient();
 
-  // 0. RUT duplicado: se revisa ANTES de crear la cuenta para no dejarla a medias.
+  // 0. Usuario y RUT duplicados: se revisan ANTES de crear la cuenta
+  //    para no dejarla a medias.
+  const { data: usuarioTomado } = await admin
+    .from("usuarios")
+    .select("id")
+    .eq("usuario", perfil.usuario)
+    .maybeSingle();
+  if (usuarioTomado) return { ok: false, mensaje: "Ese usuario ya está en uso. Elige otro." };
+
   if (perfil.rut) {
     const { data: existe } = await admin
       .from("usuarios")
@@ -88,7 +113,7 @@ export async function crearPersona(_prev: EstadoAccion, fd: FormData): Promise<E
     email,
     password,
     email_confirm: true,
-    user_metadata: { nombre: perfil.nombre },
+    user_metadata: { nombre: perfil.nombre, usuario: perfil.usuario },
   });
 
   if (errorAuth || !creado.user) {
@@ -96,14 +121,24 @@ export async function crearPersona(_prev: EstadoAccion, fd: FormData): Promise<E
       errorAuth?.code === "email_exists" || errorAuth?.message?.toLowerCase().includes("already");
     return {
       ok: false,
-      mensaje: yaExiste ? "Ya existe una cuenta con ese correo." : "No se pudo crear la cuenta.",
+      mensaje: yaExiste
+        ? correo
+          ? "Ya existe una cuenta con ese correo."
+          : "Ese usuario ya está en uso. Elige otro."
+        : "No se pudo crear la cuenta.",
     };
   }
 
   // 2. Completar el perfil (RUT, cargo, rol).
   const { error } = await admin
     .from("usuarios")
-    .update({ nombre: perfil.nombre, rut: perfil.rut, cargo: perfil.cargo, rol: perfil.rol })
+    .update({
+      nombre: perfil.nombre,
+      usuario: perfil.usuario,
+      rut: perfil.rut,
+      cargo: perfil.cargo,
+      rol: perfil.rol,
+    })
     .eq("id", creado.user.id);
 
   if (error) {

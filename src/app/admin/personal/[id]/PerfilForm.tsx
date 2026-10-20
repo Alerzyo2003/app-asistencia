@@ -6,10 +6,12 @@ import { Save } from "lucide-react";
 import { actualizarPersona, type EstadoAccion } from "../actions";
 import { BotonEnviar, MensajeAccion } from "../../ui";
 import { botonPrimario, campo, etiqueta } from "../../estilos";
+import { correoVisible } from "@/lib/usuario";
 
 export type DatosPerfil = {
   id: string;
   nombre: string;
+  usuario: string;
   rut: string | null;
   email: string;
   cargo: string | null;
@@ -35,8 +37,25 @@ export function PerfilForm({ persona, esUnoMismo }: { persona: DatosPerfil; esUn
         </label>
 
         <label className="space-y-1">
+          <span className={etiqueta}>Usuario para entrar *</span>
+          <input
+            name="usuario"
+            defaultValue={persona.usuario}
+            required
+            minLength={3}
+            maxLength={30}
+            pattern="[a-z0-9._\-]{3,30}"
+            title="Minúsculas, números, punto, guion o guion bajo (sin espacios ni tildes)"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            className={`${campo} font-mono`}
+          />
+        </label>
+
+        <label className="space-y-1">
           <span className={etiqueta}>Correo</span>
-          <input value={persona.email} disabled className={campo} />
+          <input value={correoVisible(persona.email)} disabled className={campo} />
         </label>
 
         <label className="space-y-1">

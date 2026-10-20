@@ -31,7 +31,7 @@ export default async function FichaPersonaPage({ params, searchParams }: Props) 
   const [{ data: persona }, { data: horarios }] = await Promise.all([
     supabase
       .from("usuarios")
-      .select("id, nombre, rut, email, cargo, rol, activo")
+      .select("id, nombre, usuario, rut, email, cargo, rol, activo")
       .eq("id", id)
       .maybeSingle(),
     supabase

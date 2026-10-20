@@ -10,14 +10,14 @@
   "dependencies": {
     "@supabase/ssr": "latest",
     "@supabase/supabase-js": "latest",
-    "@tailwindcss/postcss": "^4.3.3",
+    "@tailwindcss/postcss": "latest",
     "exceljs": "^4.4.0",
     "lucide-react": "latest",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",
     "server-only": "latest",
-    "tailwindcss": "^4.3.3"
+    "tailwindcss": "latest"
   },
   "devDependencies": {
     "@types/node": "latest",

@@ -5,6 +5,7 @@ import { KeyRound, UserPlus } from "lucide-react";
 
 import { crearPersona, type EstadoAccion } from "./actions";
 import { BotonEnviar, MensajeAccion } from "../ui";
+import { sugerirUsuario } from "@/lib/usuario";
 import { botonPrimario, botonSecundario, campo, etiqueta } from "../estilos";
 
 /** Contraseña temporal fácil de dictar: sin 0/O ni 1/l/I. */
@@ -20,13 +21,27 @@ function generarContrasena(): string {
 export function NuevaPersonaForm() {
   const [estado, accion] = useActionState<EstadoAccion, FormData>(crearPersona, null);
   const [password, setPassword] = useState("");
+  const [nombre, setNombre] = useState("");
+  const [usuario, setUsuario] = useState("");
+  // Mientras no se edite a mano, el usuario se sugiere a partir del nombre.
+  const [usuarioEditado, setUsuarioEditado] = useState(false);
 
   return (
     <form action={accion} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="space-y-1">
           <span className={etiqueta}>Nombre completo *</span>
-          <input name="nombre" required minLength={3} className={campo} />
+          <input
+            name="nombre"
+            required
+            minLength={3}
+            value={nombre}
+            onChange={(e) => {
+              setNombre(e.target.value);
+              if (!usuarioEditado) setUsuario(sugerirUsuario(e.target.value));
+            }}
+            className={campo}
+          />
         </label>
 
         <label className="space-y-1">
@@ -35,8 +50,31 @@ export function NuevaPersonaForm() {
         </label>
 
         <label className="space-y-1">
-          <span className={etiqueta}>Correo *</span>
-          <input name="email" type="email" required autoComplete="off" className={campo} />
+          <span className={etiqueta}>Usuario para entrar *</span>
+          <input
+            name="usuario"
+            required
+            minLength={3}
+            maxLength={30}
+            pattern="[a-z0-9._\-]{3,30}"
+            title="Minúsculas, números, punto, guion o guion bajo (sin espacios ni tildes)"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            autoComplete="off"
+            value={usuario}
+            onChange={(e) => {
+              setUsuarioEditado(true);
+              setUsuario(e.target.value.toLowerCase().replace(/\s/g, ""));
+            }}
+            className={`${campo} font-mono`}
+          />
+          <span className="text-xs text-slate-500">Se sugiere con el nombre; puedes cambiarlo.</span>
+        </label>
+
+        <label className="space-y-1">
+          <span className={etiqueta}>Correo (opcional)</span>
+          <input name="email" type="email" autoComplete="off" className={campo} />
         </label>
 
         <label className="space-y-1">

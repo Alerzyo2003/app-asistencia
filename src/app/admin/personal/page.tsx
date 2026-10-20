@@ -14,6 +14,7 @@ type FilaPersona = {
   id: string;
   nombre: string;
   rut: string | null;
+  usuario: string;
   email: string;
   cargo: string | null;
   rol: "admin" | "empleado";
@@ -26,7 +27,7 @@ export default async function PersonalPage() {
   const { data, error } = await supabase
     .from("usuarios")
     .select(
-      "id, nombre, rut, email, cargo, rol, activo, horarios(dia_semana, hora_entrada, hora_salida, tolerancia_minutos)",
+      "id, nombre, usuario, rut, email, cargo, rol, activo, horarios(dia_semana, hora_entrada, hora_salida, tolerancia_minutos)",
     )
     .order("activo", { ascending: false })
     .order("nombre");
@@ -73,7 +74,7 @@ export default async function PersonalPage() {
                       )}
                     </p>
                     <p className="text-xs text-slate-500">
-                      {p.email}
+                      <span className="font-mono text-slate-700">{p.usuario}</span>
                       {p.rut ? ` · ${p.rut}` : ""}
                     </p>
                   </td>
