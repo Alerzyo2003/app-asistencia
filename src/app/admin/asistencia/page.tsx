@@ -1,7 +1,7 @@
 /**
  * /admin/asistencia — Todas las marcaciones con filtros.
  */
-import { CheckCircle2, TriangleAlert } from "lucide-react";
+import { CheckCircle2, Fingerprint, TriangleAlert } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
 import { ZONA_HORARIA } from "@/lib/config";
@@ -63,13 +63,14 @@ export default async function RegistrosPage({ searchParams }: Props) {
       )}
 
       <div className="overflow-x-auto rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-        <table className="w-full min-w-[920px] text-left text-sm">
+        <table className="w-full min-w-[980px] text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
             <tr>
               <th className="px-4 py-3">Fecha</th>
               <th className="px-4 py-3">Hora</th>
               <th className="px-4 py-3">Persona</th>
               <th className="px-4 py-3">Tipo</th>
+              <th className="px-4 py-3">Huella</th>
               <th className="px-4 py-3">Foto</th>
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3 text-right">Distancia</th>
@@ -80,7 +81,7 @@ export default async function RegistrosPage({ searchParams }: Props) {
           <tbody className="divide-y divide-slate-100">
             {filas.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-4 py-10 text-center text-slate-500">
+                <td colSpan={10} className="px-4 py-10 text-center text-slate-500">
                   No hay marcas para estos filtros.
                 </td>
               </tr>
@@ -92,6 +93,13 @@ export default async function RegistrosPage({ searchParams }: Props) {
                 <td className="px-4 py-3 font-medium tabular-nums">{hora(m.marcado_en)}</td>
                 <td className="px-4 py-3">{m.nombre}</td>
                 <td className="px-4 py-3">{ETIQUETAS[m.tipo]}</td>
+                <td className="px-4 py-3">
+                  {m.identidad_verificada ? (
+                    <Fingerprint className="size-5 text-emerald-600" aria-label="Confirmada con huella" />
+                  ) : (
+                    <span className="text-slate-300" title="Sin huella">—</span>
+                  )}
+                </td>
                 <td className="px-4 py-2">
                   {m.foto_path && fotos.get(m.foto_path) ? (
                     <a

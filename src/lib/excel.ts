@@ -720,6 +720,7 @@ export type MarcaExcel = {
   precision: number | null;
   ip: string | null;
   conFoto: boolean;
+  conHuella: boolean;
 };
 
 export async function libroMarcas(marcas: MarcaExcel[], meta: MetaReporte): Promise<Uint8Array> {
@@ -738,6 +739,7 @@ export async function libroMarcas(marcas: MarcaExcel[], meta: MetaReporte): Prom
     { t: "Distancia\n(m)", w: 10 },
     { t: "Precisión\nGPS (m)", w: 10 },
     { t: "IP", w: 16 },
+    { t: "Huella", w: 8 },
     { t: "Foto", w: 7 },
   ];
   const N = cols.length;
@@ -751,7 +753,7 @@ export async function libroMarcas(marcas: MarcaExcel[], meta: MetaReporte): Prom
     { etiqueta: "Entradas", valor: marcas.filter((m) => m.tipo === "Entrada").length },
     { etiqueta: "Salidas", valor: marcas.filter((m) => m.tipo === "Salida").length },
     { etiqueta: "Válidas", valor: marcas.length - enRevision, nivel: "ok" },
-    { etiqueta: "En revisión", valor: enRevision, nivel: enRevision ? "alerta" : "ok", detalle: "ubicación o red" },
+    { etiqueta: "En revisión", valor: enRevision, nivel: enRevision ? "alerta" : "ok", detalle: "identidad, ubicación o red" },
   ]);
 
   fila = seccion(ws, fila, N, "Marcas en orden cronológico");
@@ -770,6 +772,7 @@ export async function libroMarcas(marcas: MarcaExcel[], meta: MetaReporte): Prom
       m.distancia === null ? null : Math.round(m.distancia),
       m.precision === null ? null : Math.round(m.precision),
       m.ip ?? "",
+      m.conHuella ? "✓" : "—",
       m.conFoto ? "📷" : "",
     ]);
     estiloFila(f, N, i, (col) => ([3, 7].includes(col) ? "left" : "center"), [7]);
@@ -777,6 +780,7 @@ export async function libroMarcas(marcas: MarcaExcel[], meta: MetaReporte): Prom
     f.getCell(3).font = fuente({ bold: true });
     f.getCell(3).alignment = { vertical: "middle", indent: 1 };
     pildora(f.getCell(6), m.valida ? "ok" : "alerta");
+    if (m.conHuella) f.getCell(11).font = fuente({ bold: true, color: { argb: NIVEL.ok.texto } });
     if (m.motivo) f.getCell(7).font = fuente({ size: 9, color: { argb: NIVEL.alerta.texto } });
     if ((m.motivo ?? "").length > 55) f.height = 30;
     // Separador por día

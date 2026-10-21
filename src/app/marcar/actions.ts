@@ -39,6 +39,7 @@ import {
 } from "@/lib/asistencia";
 import { BUCKET_FOTOS } from "@/lib/fotos";
 import { desvio, horarioDelDia } from "@/lib/horario-servidor";
+import { modoIdentidad, verificarIdentidad } from "@/lib/identidad";
 
 /** Lee un número del FormData; null si viene vacío o no es número. */
 function numero(fd: FormData, campo: string): number | null {
@@ -123,15 +124,36 @@ export async function registrarMarcaje(fd: FormData): Promise<ResultadoMarcaje> 
     return { ok: false, mensaje: `No puedes marcar "${ETIQUETAS[tipo]}" ahora. ${sugerencia}` };
   }
 
-  // 4. Geocerca + red (siempre en servidor) --------------------------------
+  // 4. Identidad: huella / Face ID en su celular registrado ------------------
+  //    - Con huella activa: es obligatoria. Si no se confirma, NO se registra
+  //      (es autenticación de la persona, igual que pedir la contraseña).
+  //    - Sin huella activa: se registra, pero queda en revisión.
+  let identidadVerificada = false;
+  let motivoIdentidad: string | null = null;
+
+  if (modoIdentidad() === "exigir") {
+    const r = await verificarIdentidad(user.id, (fd.get("identidad") as string | null) || null);
+    if (r.estado === "verificada") {
+      identidadVerificada = true;
+    } else if (r.estado === "sin_huella") {
+      motivoIdentidad = "Identidad no verificada (huella no activada)";
+    } else {
+      return {
+        ok: false,
+        mensaje: `No se pudo confirmar tu identidad: ${r.motivo}. Intenta otra vez con tu huella o rostro.`,
+      };
+    }
+  }
+
+  // 5. Geocerca + red (siempre en servidor) --------------------------------
   const cabeceras = await headers();
   const geo = evaluarGeocerca(ubicacion, obtenerConfigGeocerca());
   const red = evaluarRed(obtenerIpCliente(cabeceras), obtenerConfigRed());
 
-  const valida = geo.valida && red.valida;
-  const motivo = [geo.motivo, red.motivo].filter(Boolean).join(" · ") || null;
+  const valida = geo.valida && red.valida && !motivoIdentidad;
+  const motivo = [motivoIdentidad, geo.motivo, red.motivo].filter(Boolean).join(" · ") || null;
 
-  // 5. Foto opcional ----------------------------------------------------------
+  // 6. Foto opcional ----------------------------------------------------------
   // Si la foto falla, la marca se registra igual (la foto es opcional).
   let fotoPath: string | null = null;
   let avisoFoto: string | null = null;
@@ -152,7 +174,7 @@ export async function registrarMarcaje(fd: FormData): Promise<ResultadoMarcaje> 
     }
   }
 
-  // 6. Insertar ---------------------------------------------------------------
+  // 7. Insertar ---------------------------------------------------------------
   const { data: insertada, error: errorInsert } = await admin
     .from("asistencia")
     .insert({
@@ -167,6 +189,7 @@ export async function registrarMarcaje(fd: FormData): Promise<ResultadoMarcaje> 
       valida,
       motivo_observacion: motivo,
       foto_path: fotoPath,
+      identidad_verificada: identidadVerificada,
     })
     .select("marcado_en")
     .single();
@@ -193,7 +216,7 @@ export async function registrarMarcaje(fd: FormData): Promise<ResultadoMarcaje> 
   }).format(new Date(insertada.marcado_en));
 
   const base = valida
-    ? `${ETIQUETAS[tipo]} registrada a las ${hora}${fotoPath ? " con foto" : ""}.`
+    ? `${ETIQUETAS[tipo]} registrada a las ${hora}${identidadVerificada ? ", identidad confirmada" : ""}${fotoPath ? ", con foto" : ""}.`
     : `${ETIQUETAS[tipo]} registrada a las ${hora}, pero quedó en revisión: ${motivo}`;
 
   // ¿A tiempo o con atraso / salida anticipada? (según su turno de hoy)

@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
           precision: m.precision_m,
           ip: m.ip,
           conFoto: Boolean(m.foto_path),
+          conHuella: Boolean(m.identidad_verificada),
         })),
         meta,
       );

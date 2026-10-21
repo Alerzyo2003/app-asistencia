@@ -3,7 +3,7 @@
  */
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CalendarClock, ShieldCheck, UserRound } from "lucide-react";
+import { ArrowLeft, CalendarClock, Fingerprint, ShieldCheck, UserRound } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
 import { requerirAdmin } from "@/lib/auth";
@@ -13,6 +13,8 @@ import { ZONA_HORARIA } from "@/lib/config";
 import { PerfilForm, type DatosPerfil } from "./PerfilForm";
 import { HorarioForm, type HorarioCiclo } from "./HorarioForm";
 import { AccesoForm } from "./AccesoForm";
+import { HuellaForm } from "./HuellaForm";
+import { estadoHuella, modoIdentidad } from "@/lib/identidad";
 import { tarjeta } from "../../estilos";
 
 const RE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -30,7 +32,7 @@ export default async function FichaPersonaPage({ params, searchParams }: Props) 
   const yo = await requerirAdmin();
   const supabase = await createClient();
 
-  const [{ data: persona }, { data: horarios }] = await Promise.all([
+  const [{ data: persona }, { data: horarios }, huella] = await Promise.all([
     supabase
       .from("usuarios")
       .select("id, nombre, usuario, rut, email, cargo, rol, activo, ciclo_semanas, ciclo_inicio")
@@ -42,6 +44,7 @@ export default async function FichaPersonaPage({ params, searchParams }: Props) 
       .eq("usuario_id", id)
       .order("semana_ciclo")
       .order("dia_semana"),
+    estadoHuella(id),
   ]);
 
   if (!persona) notFound();
@@ -96,6 +99,18 @@ export default async function FichaPersonaPage({ params, searchParams }: Props) 
           cicloInicio={persona.ciclo_inicio}
           hoy={hoy}
           lunesActual={lunesDe(hoy)}
+        />
+      </section>
+
+      <section className={tarjeta}>
+        <h2 className="mb-4 flex items-center gap-2 font-semibold">
+          <Fingerprint className="size-5 text-violet-600" aria-hidden /> Huella / Face ID para marcar
+        </h2>
+        <HuellaForm
+          usuarioId={persona.id}
+          usuario={persona.usuario}
+          huella={huella}
+          exigida={modoIdentidad() === "exigir"}
         />
       </section>
 

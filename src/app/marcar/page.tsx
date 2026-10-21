@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ZONA_HORARIA } from "@/lib/config";
 import { fechaHoy, type Marcacion } from "@/lib/asistencia";
 import { horarioDelDia } from "@/lib/horario-servidor";
+import { estadoHuella, modoIdentidad } from "@/lib/identidad";
 import { letraSemana } from "@/lib/horarios";
 import { MarcajePanel } from "./MarcajePanel";
 
@@ -24,7 +25,7 @@ export default async function MarcarPage() {
 
   const hoy = fechaHoy(ZONA_HORARIA);
 
-  const [{ data: perfil }, { data: marcas, error }, horario] = await Promise.all([
+  const [{ data: perfil }, { data: marcas, error }, horario, huella] = await Promise.all([
     supabase.from("usuarios").select("nombre, ciclo_semanas").eq("id", user.id).single(),
     supabase
       .from("asistencia")
@@ -34,6 +35,7 @@ export default async function MarcarPage() {
       .order("marcado_en", { ascending: true }),
     // RLS permite leer su propio horario y turnos
     horarioDelDia(supabase, user.id, hoy),
+    estadoHuella(user.id),
   ]);
 
   // Texto del horario de hoy para mostrar en pantalla
@@ -55,6 +57,8 @@ export default async function MarcarPage() {
         nombre={perfil?.nombre ?? user.email ?? ""}
         marcasHoy={(marcas ?? []) as Marcacion[]}
         horarioHoy={horarioHoy}
+        huellaActiva={huella.activa}
+        identidadExigida={modoIdentidad() === "exigir"}
       />
     </main>
   );

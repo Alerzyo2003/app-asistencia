@@ -30,6 +30,7 @@ export type FilaMarca = {
   longitud: number | null;
   ip: string | null;
   foto_path: string | null;
+  identidad_verificada: boolean;
   nombre: string;
   rut: string | null;
 };
@@ -96,7 +97,7 @@ function consultaMarcas(supabase: SupabaseClient, f: Filtros) {
   let q = supabase
     .from("asistencia")
     .select(
-      "id, usuario_id, tipo, marcado_en, fecha, valida, motivo_observacion, distancia_m, precision_m, latitud, longitud, ip, foto_path, usuarios(nombre, rut)",
+      "id, usuario_id, tipo, marcado_en, fecha, valida, motivo_observacion, distancia_m, precision_m, latitud, longitud, ip, foto_path, identidad_verificada, usuarios(nombre, rut)",
     )
     .gte("fecha", f.desde)
     .lte("fecha", f.hasta)

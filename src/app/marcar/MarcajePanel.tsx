@@ -14,12 +14,15 @@
  * Requisito: HTTPS (o http://localhost en desarrollo) para ubicación y cámara.
  */
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { startAuthentication } from "@simplewebauthn/browser";
+import type { PublicKeyCredentialRequestOptionsJSON } from "@simplewebauthn/browser";
 import {
   CalendarClock,
   Camera,
   CheckCircle2,
   Clock,
+  Fingerprint,
   ImageIcon,
   Loader2,
   LogIn,
@@ -42,6 +45,8 @@ import {
 import { registrarMarcaje } from "./actions";
 import { cerrarSesion } from "@/app/login/actions";
 import { CamaraFoto } from "./CamaraFoto";
+import { ActivarHuella } from "./ActivarHuella";
+import { prepararVerificacion } from "./identidad-actions";
 
 const ZONA = "America/Santiago";
 
@@ -50,7 +55,10 @@ const BOTONES: { tipo: TipoEvento; icono: LucideIcon; color: string }[] = [
   { tipo: "salida", icono: LogOut, color: "bg-rose-600 hover:bg-rose-700" },
 ];
 
-type Fase = "libre" | "ubicando" | "enviando";
+type Fase = "libre" | "identidad" | "ubicando" | "enviando";
+
+/** Las opciones de huella se renuevan antes de que venza el desafío (5 min). */
+const RENOVAR_OPCIONES_MS = 4 * 60_000;
 
 // ---------------------------------------------------------------------------
 // Geolocalización del navegador envuelta en una promesa
@@ -101,9 +109,15 @@ export function MarcajePanel({
   nombre,
   marcasHoy,
   horarioHoy,
+  huellaActiva,
+  identidadExigida,
 }: {
   nombre: string;
   marcasHoy: Marcacion[];
+  /** true si la persona ya registró su huella en un celular */
+  huellaActiva: boolean;
+  /** false si IDENTIDAD_MODO=desactivado */
+  identidadExigida: boolean;
   /** "08:30 a 14:00 · Semana A", "Hoy no tienes turno" o null si no tiene horario */
   horarioHoy: string | null;
 }) {
@@ -111,6 +125,32 @@ export function MarcajePanel({
   const [tipoActivo, setTipoActivo] = useState<TipoEvento | null>(null);
   const [resultado, setResultado] = useState<ResultadoMarcaje | null>(null);
   const [avisoUbicacion, setAvisoUbicacion] = useState<string | null>(null);
+
+  // Huella: las opciones se piden ANTES del toque (Safari exige que la huella
+  // se solicite directo desde el toque, sin esperar al servidor).
+  const opcionesRef = useRef<{ datos: PublicKeyCredentialRequestOptionsJSON; en: number } | null>(null);
+
+  const renovarOpciones = useCallback(async () => {
+    if (!huellaActiva) return;
+    try {
+      const datos = await prepararVerificacion();
+      opcionesRef.current = datos ? { datos, en: Date.now() } : null;
+    } catch {
+      opcionesRef.current = null;
+    }
+  }, [huellaActiva]);
+
+  useEffect(() => {
+    if (!huellaActiva) return;
+    renovarOpciones();
+    const id = setInterval(renovarOpciones, RENOVAR_OPCIONES_MS);
+    const alVolver = () => document.visibilityState === "visible" && renovarOpciones();
+    document.addEventListener("visibilitychange", alVolver);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", alVolver);
+    };
+  }, [huellaActiva, renovarOpciones]);
 
   // Foto opcional
   const [camaraAbierta, setCamaraAbierta] = useState(false);
@@ -139,6 +179,36 @@ export function MarcajePanel({
     setResultado(null);
     setAvisoUbicacion(null);
 
+    // 0. Identidad: huella / rostro (lo primero tras el toque)
+    let identidad: string | null = null;
+    if (huellaActiva) {
+      setFase("identidad");
+      try {
+        let op = opcionesRef.current;
+        if (!op || Date.now() - op.en > RENOVAR_OPCIONES_MS) {
+          await renovarOpciones();
+          op = opcionesRef.current;
+        }
+        if (!op) throw new Error("sin-opciones");
+        const respuesta = await startAuthentication({ optionsJSON: op.datos });
+        identidad = JSON.stringify(respuesta);
+        opcionesRef.current = null; // el desafío es de un solo uso
+      } catch (e) {
+        const nombreError = (e as { name?: string })?.name;
+        setResultado({
+          ok: false,
+          mensaje:
+            nombreError === "NotAllowedError"
+              ? "No se confirmó tu huella o rostro. Toca el botón otra vez."
+              : "No se pudo usar la huella en este momento. Toca el botón otra vez.",
+        });
+        setFase("libre");
+        setTipoActivo(null);
+        renovarOpciones();
+        return;
+      }
+    }
+
     // 1. Ubicación
     setFase("ubicando");
     const lectura = await leerUbicacion();
@@ -154,6 +224,7 @@ export function MarcajePanel({
       fd.set("precision", String(lectura.precision));
     }
     if (foto) fd.set("foto", foto.blob, "foto.jpg");
+    if (identidad) fd.set("identidad", identidad);
 
     try {
       const r = await registrarMarcaje(fd);
@@ -164,6 +235,7 @@ export function MarcajePanel({
     } finally {
       setFase("libre");
       setTipoActivo(null);
+      renovarOpciones(); // nuevo desafío para la próxima marca
     }
   }
 
@@ -186,6 +258,11 @@ export function MarcajePanel({
           </form>
         </div>
         <Reloj />
+        {huellaActiva && (
+          <p className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
+            <Fingerprint className="size-3.5" aria-hidden /> Marcas con huella activadas
+          </p>
+        )}
         {horarioHoy && (
           <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-3 py-1 text-sm font-medium text-sky-800 ring-1 ring-sky-200">
             <CalendarClock className="size-4" aria-hidden />
@@ -193,6 +270,9 @@ export function MarcajePanel({
           </p>
         )}
       </header>
+
+      {/* Activar huella (si se exige y aún no la tiene) */}
+      {identidadExigida && !huellaActiva && <ActivarHuella />}
 
       {/* Foto opcional */}
       {!jornadaCerrada && (
@@ -261,6 +341,11 @@ export function MarcajePanel({
 
       {/* Estado del proceso */}
       <div aria-live="polite" className="space-y-3">
+        {fase === "identidad" && (
+          <Aviso icono={Fingerprint} tono="info">
+            Confirma con tu huella o rostro…
+          </Aviso>
+        )}
         {fase === "ubicando" && (
           <Aviso icono={MapPin} tono="info">
             Obteniendo tu ubicación…

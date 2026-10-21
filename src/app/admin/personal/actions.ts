@@ -28,6 +28,7 @@ import {
   type DiaHorario,
 } from "@/lib/horarios";
 import { PREFIJO_CORREO_INTERNO, esUsuarioValido, normalizarUsuario } from "@/lib/usuario";
+import { generarCodigoActivacion, quitarHuella } from "@/lib/identidad";
 
 export type EstadoAccion = { ok: boolean; mensaje: string } | null;
 
@@ -337,5 +338,49 @@ export async function guardarHorario(_prev: EstadoAccion, fd: FormData): Promise
       ciclo > 1
         ? `Horario guardado: ${ciclo} semanas que se alternan desde el lunes ${inicio!.split("-").reverse().join("-")}.`
         : "Horario guardado.",
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Huella / Face ID
+// ---------------------------------------------------------------------------
+
+export type EstadoCodigo = { ok: boolean; mensaje: string; codigo?: string; expiraEn?: string } | null;
+
+/** Genera el código de activación de huella (vigencia 15 min). */
+export async function generarCodigoHuella(_prev: EstadoCodigo, fd: FormData): Promise<EstadoCodigo> {
+  if (!(await adminParaAccion())) return NO_AUTORIZADO;
+
+  const id = texto(fd, "id", 40);
+  if (!RE_UUID.test(id)) return { ok: false, mensaje: "Persona no válida." };
+
+  try {
+    const { codigo, expiraEn } = await generarCodigoActivacion(id);
+    revalidatePath(`/admin/personal/${id}`);
+    return { ok: true, mensaje: "Código generado.", codigo, expiraEn };
+  } catch (e) {
+    console.error("[personal] código huella", e);
+    return { ok: false, mensaje: "No se pudo generar el código." };
+  }
+}
+
+/** Quita la huella registrada (cambio o pérdida de celular). */
+export async function quitarHuellaPersona(_prev: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  if (!(await adminParaAccion())) return NO_AUTORIZADO;
+
+  const id = texto(fd, "id", 40);
+  if (!RE_UUID.test(id)) return { ok: false, mensaje: "Persona no válida." };
+
+  try {
+    await quitarHuella(id);
+  } catch (e) {
+    console.error("[personal] quitar huella", e);
+    return { ok: false, mensaje: "No se pudo quitar la huella." };
+  }
+  revalidatePath(`/admin/personal/${id}`);
+  revalidatePath("/admin/personal");
+  return {
+    ok: true,
+    mensaje: "Huella quitada. Genera un código para que la active en su nuevo celular.",
   };
 }

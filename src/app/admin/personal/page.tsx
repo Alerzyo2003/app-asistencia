@@ -2,9 +2,10 @@
  * /admin/personal — Lista del equipo y alta de nuevas cuentas.
  */
 import Link from "next/link";
-import { ChevronRight, UserPlus } from "lucide-react";
+import { ChevronRight, Fingerprint, UserPlus } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   DIAS,
   letraSemana,
@@ -43,6 +44,12 @@ export default async function PersonalPage() {
     .order("nombre");
 
   if (error) throw new Error(`No se pudo cargar el personal: ${error.message}`);
+
+  // Quién tiene huella activada (tabla solo accesible con la clave secreta)
+  const { data: credenciales } = await createAdminClient()
+    .from("credenciales_identidad")
+    .select("usuario_id");
+  const conHuella = new Set((credenciales ?? []).map((c) => c.usuario_id));
   const personas = (data ?? []) as FilaPersona[];
   const sinHorario = personas.filter((p) => p.activo && p.horarios.length === 0).length;
   const hoy = fechaHoy(ZONA_HORARIA);
@@ -92,6 +99,15 @@ export default async function PersonalPage() {
                     </p>
                     <p className="text-xs text-slate-500">
                       <span className="font-mono text-slate-700">{p.usuario}</span>
+                      {conHuella.has(p.id) ? (
+                        <span className="ml-1.5 inline-flex items-center gap-0.5 text-emerald-700" title="Huella activada">
+                          <Fingerprint className="inline size-3.5" aria-hidden /> huella
+                        </span>
+                      ) : (
+                        <span className="ml-1.5 inline-flex items-center gap-0.5 text-amber-700" title="Sin huella activada">
+                          <Fingerprint className="inline size-3.5" aria-hidden /> sin huella
+                        </span>
+                      )}
                       {p.rut ? ` · ${p.rut}` : ""}
                     </p>
                   </td>
