@@ -24,6 +24,7 @@ import {
 } from "@/lib/horarios";
 import { FilaSemana, type CeldaDia } from "./FilaSemana";
 import { CopiarSemana } from "./CopiarSemana";
+import { CargarPlantilla } from "./CargarPlantilla";
 
 type Props = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -94,13 +95,18 @@ export default async function TurnosPage({ searchParams }: Props) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
           <h1 className="flex items-center gap-2 text-xl font-semibold">
-            <CalendarDays className="size-6 text-sky-600" aria-hidden /> Turnos semanales
+            <CalendarDays className="size-6 text-sky-600" aria-hidden /> Turnos
           </h1>
           <p className="text-sm text-slate-500">
-            Los turnos rotativos (Semana A / B) ya se aplican solos. Aquí solo ajustas cambios
-            puntuales: un día distinto, un reemplazo o un día libre.
+            Carga el mes completo con la planilla Excel, o ajusta días puntuales en la grilla.
           </p>
         </div>
+      </div>
+
+      <CargarPlantilla lunesActual={lunesDe(hoy)} />
+
+      <div className="flex flex-wrap items-end justify-between gap-4 border-t border-slate-200 pt-5">
+        <h2 className="font-semibold">Ajustar una semana</h2>
         <CopiarSemana lunes={lunes} />
       </div>
 

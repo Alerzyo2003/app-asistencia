@@ -799,3 +799,208 @@ export async function libroMarcas(marcas: MarcaExcel[], meta: MetaReporte): Prom
   const buffer = await wb.xlsx.writeBuffer();
   return new Uint8Array(buffer as ArrayBuffer);
 }
+
+// ---------------------------------------------------------------------------
+// Plantilla mensual de turnos (descargar → llenar → subir)
+// ---------------------------------------------------------------------------
+
+export type FilaPlantilla = {
+  usuario: string;
+  nombre: string;
+  /** fecha "YYYY-MM-DD" → texto del turno ("8:15 a 16:40", "libre", "") */
+  valores: Record<string, string>;
+};
+
+const DIAS_CORTOS = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"];
+
+export async function libroPlantillaTurnos(params: {
+  fechas: string[]; // en orden, solo los días que se planifican (p. ej. lun–sáb)
+  filas: FilaPlantilla[];
+  titulo: string;
+}): Promise<Uint8Array> {
+  const { fechas, filas, titulo } = params;
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Control de asistencia · Clínica Dignidad";
+  const ws = wb.addWorksheet("Turnos", { properties: { tabColor: { argb: C.marca } } });
+
+  const N = 2 + fechas.length;
+  ws.columns = [{ width: 15 }, { width: 22 }, ...fechas.map(() => ({ width: 12 }))];
+
+  banda(
+    ws,
+    N,
+    titulo,
+    "Escribe el turno de cada día y sube este archivo en la app: Turnos → Cargar planilla",
+  );
+
+  // Instrucciones
+  ws.mergeCells(4, 1, 4, N);
+  const ayuda = ws.getCell(4, 1);
+  ayuda.value =
+    "Formato: 8:15 a 16:40  ·  también sirve 8 15 a 16 40 o 13 a 18.   " +
+    "Días sin trabajo: feriado o libre.   Celda vacía = usa su horario base.   " +
+    "No cambies la columna Usuario ni las fechas.";
+  ayuda.font = fuente({ size: 9, color: { argb: C.gris } });
+  ayuda.alignment = { wrapText: true, vertical: "middle" };
+  ayuda.fill = relleno(C.fondoTarjeta);
+  ws.getRow(4).height = 30;
+
+  // Fila de semanas (agrupa las columnas de cada semana)
+  const filaSemanas = 6;
+  const filaEnc = 7;
+  let inicio = 0;
+  while (inicio < fechas.length) {
+    let fin = inicio;
+    while (fin + 1 < fechas.length && Date.parse(fechas[fin + 1]) - Date.parse(fechas[inicio]) < 7 * 86_400_000 && new Date(`${fechas[fin + 1]}T00:00:00Z`).getUTCDay() !== 1) fin++;
+    ws.mergeCells(filaSemanas, 3 + inicio, filaSemanas, 3 + fin);
+    const c = ws.getCell(filaSemanas, 3 + inicio);
+    c.value = `Semana ${fechaTexto(fechas[inicio]).slice(0, 5)} al ${fechaTexto(fechas[fin]).slice(0, 5)}`;
+    c.font = fuente({ bold: true, size: 9, color: { argb: C.marca } });
+    c.alignment = { horizontal: "center" };
+    c.fill = relleno(C.acentoClaro);
+    c.border = { left: { style: "medium", color: { argb: C.marca } } };
+    inicio = fin + 1;
+  }
+
+  // Encabezado
+  const enc = ws.getRow(filaEnc);
+  enc.values = ["Usuario", "Nombre", ...fechas.map((f) => {
+    const d = new Date(`${f}T00:00:00Z`);
+    return `${DIAS_CORTOS[(d.getUTCDay() + 6) % 7]} ${fechaTexto(f).slice(0, 5)}`;
+  })];
+  enc.height = 24;
+  for (let col = 1; col <= N; col++) {
+    const c = enc.getCell(col);
+    c.font = fuente({ bold: true, size: 9, color: { argb: C.blanco } });
+    c.fill = relleno(C.acento);
+    c.alignment = { horizontal: "center", vertical: "middle" };
+    c.border = BORDE;
+  }
+
+  // Fila oculta con las fechas exactas (la app la usa al subir el archivo)
+  const filaFechas = ws.getRow(5);
+  filaFechas.values = ["fechas", "", ...fechas];
+  filaFechas.hidden = true;
+
+  filas.forEach((f, i) => {
+    const r = ws.addRow([f.usuario, f.nombre, ...fechas.map((fe) => f.valores[fe] ?? "")]);
+    r.height = 22;
+    for (let col = 1; col <= N; col++) {
+      const c = r.getCell(col);
+      c.font = fuente(col === 1 ? { bold: true, color: { argb: C.marca } } : {});
+      c.alignment = { horizontal: col <= 2 ? "left" : "center", vertical: "middle", indent: col <= 2 ? 1 : 0 };
+      c.border = BORDE;
+      if (col > 2) {
+        const fecha = fechas[col - 3];
+        const d = new Date(`${fecha}T00:00:00Z`).getUTCDay();
+        if (d === 6) c.fill = relleno("FFF5F3FF"); // sábado
+        else if (i % 2 === 1) c.fill = relleno(C.cebra);
+        if (d === 1) c.border = { ...BORDE, left: { style: "medium", color: { argb: C.marca } } };
+        c.numFmt = "@"; // texto: Excel no convierte "8:15" en hora
+        const valor = String(c.value ?? "").toLowerCase();
+        if (valor.includes("feriado")) pildora(c, "falta");
+        else if (valor.includes("libre")) pildora(c, "neutro");
+      } else if (i % 2 === 1) {
+        c.fill = relleno(C.cebra);
+      }
+    }
+  });
+
+  // Colores automáticos al escribir (feriado / libre)
+  if (filas.length && fechas.length) {
+    const ref = `C${filaEnc + 1}:${ws.getColumn(N).letter}${filaEnc + filas.length}`;
+    ws.addConditionalFormatting({
+      ref,
+      rules: [
+        { type: "containsText", operator: "containsText", text: "feriado", priority: 1,
+          style: { fill: { type: "pattern", pattern: "solid", bgColor: { argb: NIVEL.falta.fondo } }, font: { bold: true, color: { argb: NIVEL.falta.texto } } } },
+        { type: "containsText", operator: "containsText", text: "libre", priority: 2,
+          style: { fill: { type: "pattern", pattern: "solid", bgColor: { argb: NIVEL.neutro.fondo } }, font: { color: { argb: NIVEL.neutro.texto } } } },
+      ],
+    });
+  }
+
+  ws.views = [{ state: "frozen", ySplit: filaEnc, xSplit: 2, showGridLines: false }];
+  ws.pageSetup = {
+    orientation: "landscape",
+    paperSize: 9,
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 },
+  };
+
+  const buffer = await wb.xlsx.writeBuffer();
+  return new Uint8Array(buffer as ArrayBuffer);
+}
+
+/** Texto de una celda (sea texto, número, fórmula o texto enriquecido). */
+function textoCelda(c: ExcelJS.Cell): string {
+  const v = c.value;
+  if (v === null || v === undefined) return "";
+  if (v instanceof Date) {
+    // Excel convirtió "8:15" en hora: lo devolvemos como texto HH:MM
+    return `${v.getUTCHours()}:${String(v.getUTCMinutes()).padStart(2, "0")}`;
+  }
+  if (typeof v === "object" && "richText" in v) return v.richText.map((t) => t.text).join("");
+  if (typeof v === "object" && "result" in v) return String(v.result ?? "");
+  if (typeof v === "object" && "text" in v) return String(v.text);
+  return String(v);
+}
+
+export type PlantillaLeida = {
+  fechas: string[];
+  filas: { numeroFila: number; clave: string; valores: { fecha: string; texto: string }[] }[];
+};
+
+/** Lee la plantilla subida. Lanza Error con un mensaje claro si no la reconoce. */
+export async function leerPlantillaTurnos(datos: ArrayBuffer): Promise<PlantillaLeida> {
+  const wb = new ExcelJS.Workbook();
+  try {
+    await wb.xlsx.load(datos);
+  } catch {
+    throw new Error("El archivo no es un Excel válido (.xlsx).");
+  }
+  const ws = wb.getWorksheet("Turnos") ?? wb.worksheets[0];
+  if (!ws) throw new Error("El archivo no tiene hojas.");
+
+  // Buscar la fila de encabezado ("Usuario" en la columna A)
+  let filaEnc = 0;
+  for (let r = 1; r <= Math.min(ws.rowCount, 40); r++) {
+    if (textoCelda(ws.getCell(r, 1)).trim().toLowerCase() === "usuario") {
+      filaEnc = r;
+      break;
+    }
+  }
+  if (!filaEnc) throw new Error('No se encontró la fila de encabezado ("Usuario"). Usa la plantilla que descarga la app.');
+
+  // Fechas: en la fila oculta "fechas" que trae la plantilla
+  const fechas: { col: number; fecha: string }[] = [];
+  let filaFechas = 0;
+  for (let r = 1; r < filaEnc; r++) {
+    if (textoCelda(ws.getCell(r, 1)).trim().toLowerCase() === "fechas") filaFechas = r;
+  }
+  if (filaFechas) {
+    const fila = ws.getRow(filaFechas);
+    for (let col = 3; col <= fila.cellCount; col++) {
+      const v = fila.getCell(col).value;
+      const fecha =
+        v instanceof Date ? v.toISOString().slice(0, 10) : textoCelda(fila.getCell(col)).match(/\d{4}-\d{2}-\d{2}/)?.[0];
+      if (fecha) fechas.push({ col, fecha });
+    }
+  }
+  if (!fechas.length) throw new Error("No se encontraron las fechas en el encabezado. Usa la plantilla que descarga la app.");
+
+  const filas: PlantillaLeida["filas"] = [];
+  for (let r = filaEnc + 1; r <= ws.rowCount; r++) {
+    const usuario = textoCelda(ws.getCell(r, 1)).trim();
+    const nombre = textoCelda(ws.getCell(r, 2)).trim();
+    if (!usuario && !nombre) continue;
+    filas.push({
+      numeroFila: r,
+      clave: usuario || nombre,
+      valores: fechas.map(({ col, fecha }) => ({ fecha, texto: textoCelda(ws.getCell(r, col)).trim() })),
+    });
+  }
+  return { fechas: fechas.map((f) => f.fecha), filas };
+}

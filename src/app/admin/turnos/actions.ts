@@ -23,6 +23,8 @@ import {
   diaMes,
   horarioEfectivo,
 } from "@/lib/horarios";
+import { leerPlantillaTurnos } from "@/lib/excel";
+import { leerTurno, normalizarTexto, resolverPersona } from "@/lib/plantilla-turnos";
 import type { EstadoAccion } from "../personal/actions";
 
 const RE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -194,5 +196,197 @@ export async function copiarSemanaAnterior(_prev: EstadoAccion, fd: FormData): P
     mensaje: anteriores?.length
       ? `Semana copiada (${anteriores.length} ${anteriores.length === 1 ? "cambio" : "cambios"} sobre el horario base).`
       : "La semana anterior usaba solo horarios base: esta semana quedó igual.",
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Cargar planilla mensual (Excel)
+// ---------------------------------------------------------------------------
+
+/** Un cambio a aplicar: "libre", "HH:MM-HH:MM" o "base" (volver al horario base). */
+export type CambioPlantilla = {
+  usuarioId: string;
+  persona: string;
+  fecha: string;
+  valor: string;
+  motivo?: string; // "feriado", "libre"… (solo informativo)
+};
+
+export type VistaPrevia =
+  | {
+      ok: true;
+      cambios: CambioPlantilla[];
+      errores: string[];
+      personas: number;
+      desde: string;
+      hasta: string;
+    }
+  | { ok: false; mensaje: string };
+
+const MAX_BYTES_PLANTILLA = 2 * 1024 * 1024;
+const DIAS_CORTOS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+const etiquetaFecha = (f: string) =>
+  `${DIAS_CORTOS[new Date(`${f}T00:00:00Z`).getUTCDay()]} ${f.slice(8, 10)}-${f.slice(5, 7)}`;
+
+/** Paso 1: lee el Excel y muestra qué se va a cambiar (sin guardar nada). */
+export async function previsualizarPlantilla(_prev: VistaPrevia | null, fd: FormData): Promise<VistaPrevia> {
+  if (!(await adminParaAccion())) return { ok: false, mensaje: "No tienes permisos para esto." };
+
+  const archivo = fd.get("archivo");
+  if (!(archivo instanceof File) || archivo.size === 0) return { ok: false, mensaje: "Elige el archivo Excel." };
+  if (archivo.size > MAX_BYTES_PLANTILLA) return { ok: false, mensaje: "El archivo es demasiado grande." };
+
+  let leida;
+  try {
+    leida = await leerPlantillaTurnos(await archivo.arrayBuffer());
+  } catch (e) {
+    return { ok: false, mensaje: (e as Error).message };
+  }
+  if (leida.fechas.length > 62) return { ok: false, mensaje: "La planilla tiene demasiados días (máximo 2 meses)." };
+
+  const { data: personas, error } = await createAdminClient()
+    .from("usuarios")
+    .select("id, usuario, nombre")
+    .eq("activo", true);
+  if (error) return { ok: false, mensaje: "No se pudo leer el personal." };
+
+  const cambios: CambioPlantilla[] = [];
+  const errores: string[] = [];
+  const vistos = new Set<string>();
+
+  for (const fila of leida.filas) {
+    const r = resolverPersona(fila.clave, personas ?? []);
+    if (!r.ok) {
+      errores.push(`Fila ${fila.numeroFila}: ${r.error}`);
+      continue;
+    }
+    if (vistos.has(r.persona.id)) {
+      errores.push(`Fila ${fila.numeroFila}: ${r.persona.nombre} aparece dos veces; se usa solo la primera.`);
+      continue;
+    }
+    vistos.add(r.persona.id);
+
+    for (const { fecha, texto } of fila.valores) {
+      const v = leerTurno(texto);
+      if (v.tipo === "error") {
+        errores.push(`${r.persona.nombre}, ${etiquetaFecha(fecha)}: no se entiende "${v.texto}" (se dejó sin cambio).`);
+        continue;
+      }
+      if (v.tipo === "base") {
+        // Celda vacía: no se toca, salvo que diga "base" explícitamente
+        if (normalizarTexto(texto) === "base") {
+          cambios.push({ usuarioId: r.persona.id, persona: r.persona.nombre, fecha, valor: "base" });
+        }
+        continue;
+      }
+      cambios.push({
+        usuarioId: r.persona.id,
+        persona: r.persona.nombre,
+        fecha,
+        valor: v.tipo === "libre" ? "libre" : `${v.entrada}-${v.salida}`,
+        motivo: v.tipo === "libre" ? v.motivo : undefined,
+      });
+    }
+  }
+
+  return {
+    ok: true,
+    cambios,
+    errores,
+    personas: vistos.size,
+    desde: leida.fechas[0],
+    hasta: leida.fechas[leida.fechas.length - 1],
+  };
+}
+
+/**
+ * Paso 2: guarda los turnos. Se vuelve a validar todo en el servidor.
+ * Si un día queda igual a su horario base, se borra el turno (manda el base).
+ */
+export async function aplicarPlantilla(cambiosJSON: string): Promise<{ ok: boolean; mensaje: string }> {
+  if (!(await adminParaAccion())) return { ok: false, mensaje: "No tienes permisos para esto." };
+
+  let cambios: CambioPlantilla[];
+  try {
+    cambios = JSON.parse(cambiosJSON);
+    if (!Array.isArray(cambios) || cambios.length > 5000) throw new Error();
+  } catch {
+    return { ok: false, mensaje: "Datos no válidos." };
+  }
+
+  // Validación de cada cambio
+  const RE_TRAMO = /^(\d{2}:\d{2})-(\d{2}:\d{2})$/;
+  for (const c of cambios) {
+    if (!RE_UUID.test(c.usuarioId) || !esFecha(c.fecha)) return { ok: false, mensaje: "Datos no válidos." };
+    if (c.valor !== "libre" && c.valor !== "base") {
+      const m = c.valor.match(RE_TRAMO);
+      if (!m || validarTramo(c.fecha, m[1], m[2])) return { ok: false, mensaje: `Turno no válido: ${c.valor}` };
+    }
+  }
+
+  const admin = createAdminClient();
+  const ids = [...new Set(cambios.map((c) => c.usuarioId))];
+  const [{ data: personas }, { data: bases }] = await Promise.all([
+    admin.from("usuarios").select("id, ciclo_semanas, ciclo_inicio").in("id", ids),
+    admin
+      .from("horarios")
+      .select("usuario_id, semana_ciclo, dia_semana, hora_entrada, hora_salida, tolerancia_minutos")
+      .in("usuario_id", ids),
+  ]);
+  const personaDe = new Map((personas ?? []).map((p) => [p.id, p]));
+
+  const aGuardar: Record<string, unknown>[] = [];
+  const aBorrar: { usuarioId: string; fecha: string }[] = [];
+  const ahora = new Date().toISOString();
+
+  for (const c of cambios) {
+    const p = personaDe.get(c.usuarioId);
+    if (!p) continue;
+    const base = (bases ?? []).filter((b) => b.usuario_id === c.usuarioId);
+    const e = horarioEfectivo({ fecha: c.fecha, base, turno: null, cicloSemanas: p.ciclo_semanas, cicloInicio: p.ciclo_inicio });
+    const tolerancia = e.tipo === "trabajo" ? e.tolerancia : TOLERANCIA_POR_DEFECTO;
+
+    if (c.valor === "base") {
+      aBorrar.push({ usuarioId: c.usuarioId, fecha: c.fecha });
+      continue;
+    }
+    const libre = c.valor === "libre";
+    const [entrada, salida] = libre ? [null, null] : c.valor.split("-");
+    const igualAlBase =
+      (libre && e.tipo !== "trabajo") || (!libre && e.tipo === "trabajo" && e.entrada === entrada && e.salida === salida);
+
+    if (igualAlBase) aBorrar.push({ usuarioId: c.usuarioId, fecha: c.fecha });
+    else
+      aGuardar.push({
+        usuario_id: c.usuarioId,
+        fecha: c.fecha,
+        libre,
+        hora_entrada: entrada,
+        hora_salida: salida,
+        tolerancia_minutos: tolerancia,
+        updated_at: ahora,
+      });
+  }
+
+  for (let i = 0; i < aGuardar.length; i += 500) {
+    const { error } = await admin.from("turnos").upsert(aGuardar.slice(i, i + 500), { onConflict: "usuario_id,fecha" });
+    if (error) {
+      console.error("[plantilla] upsert", error);
+      return { ok: false, mensaje: "No se pudieron guardar los turnos. No se completó la carga." };
+    }
+  }
+
+  // Borrados agrupados por persona
+  for (const id of new Set(aBorrar.map((b) => b.usuarioId))) {
+    const fechas = aBorrar.filter((b) => b.usuarioId === id).map((b) => b.fecha);
+    const { error } = await admin.from("turnos").delete().eq("usuario_id", id).in("fecha", fechas);
+    if (error) console.error("[plantilla] delete", error);
+  }
+
+  revalidatePath("/admin/turnos");
+  revalidatePath("/admin/reportes");
+  return {
+    ok: true,
+    mensaje: `Planilla cargada: ${cambios.length} días de ${ids.length} ${ids.length === 1 ? "persona" : "personas"}.`,
   };
 }
