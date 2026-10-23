@@ -175,6 +175,9 @@ export default async function TurnosPage({ searchParams }: Props) {
                   semana={p.semana}
                   lunes={lunes}
                   celdas={p.celdas}
+                  otras={filas
+                    .filter((o) => o.id !== p.id)
+                    .map((o) => ({ id: o.id, nombre: o.nombre, celdas: o.celdas }))}
                 />
               ))}
             </tbody>
