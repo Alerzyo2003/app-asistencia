@@ -25,7 +25,7 @@ export default function LoginPage() {
           <input
             name="usuario"
             type="text"
-            placeholder="ej. carlospinto"
+            placeholder="ej. jorgeopazo"
             autoComplete="username"
             autoCapitalize="none"
             autoCorrect="off"
