@@ -14,7 +14,7 @@
  */
 
 import { useActionState, useState } from "react";
-import { CalendarSync, Copy, CopyCheck, Save, TriangleAlert } from "lucide-react";
+import { CalendarSync, ClipboardCopy, Copy, CopyCheck, Save, TriangleAlert } from "lucide-react";
 
 import { guardarHorario, type EstadoAccion } from "../actions";
 import { BotonEnviar, MensajeAccion } from "../../ui";
@@ -33,6 +33,15 @@ import {
 } from "@/lib/horarios";
 
 export type HorarioCiclo = DiaHorario & { semana_ciclo: number };
+
+/** Horario de otra persona, para copiarlo con "Copiar horario de…". */
+export type HorarioOtraPersona = {
+  id: string;
+  nombre: string;
+  cicloSemanas: number;
+  cicloInicio: string | null;
+  horarios: HorarioCiclo[];
+};
 
 type Fila = DiaHorario & { trabaja: boolean };
 
@@ -58,6 +67,7 @@ export function HorarioForm({
   cicloInicio,
   hoy,
   lunesActual,
+  otras = [],
 }: {
   usuarioId: string;
   actual: HorarioCiclo[];
@@ -65,6 +75,8 @@ export function HorarioForm({
   cicloInicio: string | null;
   hoy: string;
   lunesActual: string;
+  /** Otras personas con horario, para copiar el suyo */
+  otras?: HorarioOtraPersona[];
 }) {
   const [estado, accion] = useActionState<EstadoAccion, FormData>(guardarHorario, null);
 
@@ -74,6 +86,22 @@ export function HorarioForm({
   const [semanas, setSemanas] = useState<Fila[][]>(() =>
     Array.from({ length: MAX_SEMANAS_CICLO }, (_, i) => semanaInicial(actual, i + 1)),
   );
+
+  const [copiadoDe, setCopiadoDe] = useState<string | null>(null);
+
+  /**
+   * Carga en el formulario el horario de otra persona (días, horas, tolerancia,
+   * rotación A/B y lunes de inicio). No se guarda hasta presionar "Guardar".
+   */
+  function copiarDe(id: string) {
+    const otra = otras.find((o) => o.id === id);
+    if (!otra) return;
+    setCiclo(otra.cicloSemanas);
+    setInicio(otra.cicloInicio ?? lunesActual);
+    setSemanas(Array.from({ length: MAX_SEMANAS_CICLO }, (_, i) => semanaInicial(otra.horarios, i + 1)));
+    setPestana(1);
+    setCopiadoDe(otra.nombre);
+  }
 
   const actualCiclo = semanaDelCiclo(hoy, inicio, ciclo);
   const filas = semanas[pestana - 1];
@@ -112,6 +140,35 @@ export function HorarioForm({
   return (
     <form action={accion} className="space-y-5">
       <input type="hidden" name="id" value={usuarioId} />
+
+      {/* Copiar el horario de otra persona */}
+      {otras.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-xl border border-dashed border-sky-300 bg-sky-50/50 p-3 sm:flex-row sm:items-center">
+          <label htmlFor="copiar-de" className="flex items-center gap-1.5 text-sm font-medium text-sky-900">
+            <ClipboardCopy className="size-4" aria-hidden /> Copiar horario de
+          </label>
+          <select
+            id="copiar-de"
+            value=""
+            onChange={(e) => copiarDe(e.target.value)}
+            className={`${campo} sm:max-w-xs`}
+          >
+            <option value="">Elegir persona…</option>
+            {otras.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.nombre}
+                {o.cicloSemanas > 1 ? ` (rotativo ${o.cicloSemanas} sem.)` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      {copiadoDe && (
+        <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200">
+          Se copió el horario de <strong>{copiadoDe}</strong>. Ajusta lo que necesites y presiona{" "}
+          <strong>Guardar horario</strong> (aún no se ha guardado).
+        </p>
+      )}
 
       {/* Configuración del ciclo */}
       <div className="grid gap-4 rounded-xl bg-slate-50 p-4 sm:grid-cols-2">
