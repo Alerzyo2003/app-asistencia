@@ -52,6 +52,7 @@ export function FilaSemana({
   nombre,
   cargo,
   semana,
+  otras = [],
   lunes,
   celdas,
 }: {
@@ -59,6 +60,8 @@ export function FilaSemana({
   nombre: string;
   cargo: string | null;
   semana: string | null;
+  /** Semanas de las otras personas, para "Copiar de…" */
+  otras?: { id: string; nombre: string; celdas: CeldaDia[] }[];
   lunes: string;
   celdas: CeldaDia[];
 }) {
@@ -155,6 +158,25 @@ export function FilaSemana({
           >
             <RotateCcw className="size-3.5" aria-hidden /> Base
           </button>
+          {otras.length > 0 && (
+            <select
+              value=""
+              onChange={(e) => {
+                const otra = otras.find((o) => o.id === e.target.value);
+                if (otra) setDias(otra.celdas.map(desdeEfectivo));
+              }}
+              className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-600"
+              title="Copia la semana de otra persona en esta fila (luego presiona Guardar)"
+              aria-label={`Copiar semana de otra persona a ${nombre}`}
+            >
+              <option value="">Copiar de…</option>
+              {otras.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.nombre}
+                </option>
+              ))}
+            </select>
+          )}
         </form>
         <div className="mt-2 w-40">
           <MensajeAccion estado={estado} />
