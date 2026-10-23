@@ -11,7 +11,7 @@ import { lunesDe } from "@/lib/horarios";
 import { fechaHoy } from "@/lib/asistencia";
 import { ZONA_HORARIA } from "@/lib/config";
 import { PerfilForm, type DatosPerfil } from "./PerfilForm";
-import { HorarioForm, type HorarioCiclo } from "./HorarioForm";
+import { HorarioForm, type HorarioCiclo, type HorarioOtraPersona } from "./HorarioForm";
 import { AccesoForm } from "./AccesoForm";
 import { HuellaForm } from "./HuellaForm";
 import { estadoHuella, modoIdentidad } from "@/lib/identidad";
@@ -32,7 +32,7 @@ export default async function FichaPersonaPage({ params, searchParams }: Props) 
   const yo = await requerirAdmin();
   const supabase = await createClient();
 
-  const [{ data: persona }, { data: horarios }, huella] = await Promise.all([
+  const [{ data: persona }, { data: horarios }, huella, { data: otrasPersonas }] = await Promise.all([
     supabase
       .from("usuarios")
       .select("id, nombre, usuario, rut, email, cargo, rol, activo, ciclo_semanas, ciclo_inicio")
@@ -45,6 +45,15 @@ export default async function FichaPersonaPage({ params, searchParams }: Props) 
       .order("semana_ciclo")
       .order("dia_semana"),
     estadoHuella(id),
+    // Otras personas activas con su horario, para "Copiar horario de…"
+    supabase
+      .from("usuarios")
+      .select(
+        "id, nombre, ciclo_semanas, ciclo_inicio, horarios(semana_ciclo, dia_semana, hora_entrada, hora_salida, tolerancia_minutos)",
+      )
+      .eq("activo", true)
+      .neq("id", id)
+      .order("nombre"),
   ]);
 
   if (!persona) notFound();
@@ -52,11 +61,23 @@ export default async function FichaPersonaPage({ params, searchParams }: Props) 
   const esUnoMismo = yo.id === persona.id;
   const hoy = fechaHoy(ZONA_HORARIA);
   // Postgres devuelve "08:30:00"; el input type="time" usa "08:30".
-  const horarioActual: HorarioCiclo[] = (horarios ?? []).map((h) => ({
+  const recortar = (h: HorarioCiclo): HorarioCiclo => ({
     ...h,
     hora_entrada: h.hora_entrada.slice(0, 5),
     hora_salida: h.hora_salida.slice(0, 5),
-  }));
+  });
+  const horarioActual: HorarioCiclo[] = (horarios ?? []).map(recortar);
+
+  // Solo se ofrecen las personas que tienen algún horario cargado
+  const otras: HorarioOtraPersona[] = (otrasPersonas ?? [])
+    .filter((o) => (o.horarios as HorarioCiclo[]).length > 0)
+    .map((o) => ({
+      id: o.id,
+      nombre: o.nombre,
+      cicloSemanas: o.ciclo_semanas ?? 1,
+      cicloInicio: o.ciclo_inicio,
+      horarios: (o.horarios as HorarioCiclo[]).map(recortar),
+    }));
 
   return (
     <div className="space-y-6">
@@ -99,6 +120,7 @@ export default async function FichaPersonaPage({ params, searchParams }: Props) 
           cicloInicio={persona.ciclo_inicio}
           hoy={hoy}
           lunesActual={lunesDe(hoy)}
+          otras={otras}
         />
       </section>
 
