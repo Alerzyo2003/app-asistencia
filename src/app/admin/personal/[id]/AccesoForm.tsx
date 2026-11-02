@@ -5,7 +5,7 @@ import { KeyRound, UserCheck, UserX } from "lucide-react";
 
 import { cambiarActivo, cambiarContrasena, type EstadoAccion } from "../actions";
 import { BotonEnviar, MensajeAccion } from "../../ui";
-import { botonPeligro, botonPrimario, botonSecundario, campo, etiqueta } from "../../estilos";
+import { anchoMovil, botonPeligro, botonPrimario, botonSecundario, campo, etiqueta } from "../../estilos";
 
 export function AccesoForm({
   usuarioId,
@@ -35,7 +35,7 @@ export function AccesoForm({
               autoComplete="new-password"
               className={`${campo} font-mono`}
             />
-            <BotonEnviar className={botonSecundario}>
+            <BotonEnviar className={`${botonSecundario} shrink-0`}>
               <KeyRound className="size-4" aria-hidden /> Cambiar
             </BotonEnviar>
           </div>
@@ -52,16 +52,16 @@ export function AccesoForm({
               e.preventDefault();
             }
           }}
-          className="space-y-3 border-t border-slate-100 pt-5"
+          className="space-y-3 border-t border-tinta-100 pt-5"
         >
           <input type="hidden" name="id" value={usuarioId} />
           <input type="hidden" name="activar" value={activo ? "0" : "1"} />
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-tinta-600">
             {activo
               ? "Desactivar bloquea el inicio de sesión. Sus marcas anteriores se conservan."
               : "La cuenta está desactivada y no puede iniciar sesión."}
           </p>
-          <BotonEnviar className={activo ? botonPeligro : botonPrimario}>
+          <BotonEnviar className={`${activo ? botonPeligro : botonPrimario} ${anchoMovil}`}>
             {activo ? (
               <>
                 <UserX className="size-4" aria-hidden /> Desactivar cuenta

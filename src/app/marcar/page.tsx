@@ -52,7 +52,7 @@ export default async function MarcarPage() {
   }
 
   return (
-    <main className="min-h-dvh bg-slate-50">
+    <main className="min-h-dvh">
       <MarcajePanel
         nombre={perfil?.nombre ?? user.email ?? ""}
         marcasHoy={(marcas ?? []) as Marcacion[]}

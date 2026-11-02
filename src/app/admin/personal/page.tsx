@@ -17,7 +17,7 @@ import { fechaHoy } from "@/lib/asistencia";
 import { ZONA_HORARIA } from "@/lib/config";
 import { duracion } from "@/lib/formato";
 import { NuevaPersonaForm } from "./NuevaPersonaForm";
-import { tarjeta } from "../estilos";
+import { cabeceraTabla, cajaTabla, cuerpoTabla, tabla, tarjeta } from "../estilos";
 
 type FilaPersona = {
   id: string;
@@ -61,66 +61,71 @@ export default async function PersonalPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Personal</h1>
+    <div className="space-y-5 md:space-y-6">
+      <h1 className="text-2xl text-noche-900">Personal</h1>
 
       {sinHorario > 0 && (
-        <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+        <p className="rounded-xl bg-oro-50 p-3 text-sm text-oro-800">
           {sinHorario === 1 ? "1 persona activa no tiene" : `${sinHorario} personas activas no tienen`}{" "}
           horario asignado. Sin horario no se pueden calcular sus atrasos.
         </p>
       )}
 
-      <div className="overflow-x-auto rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-        <table className="w-full min-w-[720px] text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+      <div className={cajaTabla}>
+        <table className={`${tabla} md:min-w-[720px]`}>
+          <thead className={cabeceraTabla}>
             <tr>
-              <th className="px-4 py-3">Persona</th>
-              <th className="px-4 py-3">Cargo</th>
-              <th className="px-4 py-3">Días</th>
-              <th className="px-4 py-3 text-right">Horas esta semana</th>
-              <th className="px-4 py-3">Estado</th>
+              <th className="px-4 py-3 font-semibold">Persona</th>
+              <th className="px-4 py-3 font-semibold">Cargo</th>
+              <th className="px-4 py-3 font-semibold">Días</th>
+              <th className="px-4 py-3 text-right font-semibold">Horas esta semana</th>
+              <th className="px-4 py-3 font-semibold">Estado</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className={cuerpoTabla}>
             {personas.map((p) => {
               const diasTrabajo = new Set(horariosSemana(p).map((h) => h.dia_semana));
               return (
-                <tr key={p.id} className={p.activo ? "" : "text-slate-400"}>
-                  <td className="px-4 py-3">
+                <tr
+                  key={p.id}
+                  className={`relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-4 py-3 md:table-row ${
+                    p.activo ? "" : "text-tinta-400"
+                  }`}
+                >
+                  <td className="md:px-4 md:py-3">
                     <p className="font-medium">
                       {p.nombre}
                       {p.rol === "admin" && (
-                        <span className="ml-2 rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">
+                        <span className="ml-2 rounded-full bg-noche-900 px-2 py-0.5 text-xs font-medium text-white">
                           Admin
                         </span>
                       )}
                     </p>
-                    <p className="text-xs text-slate-500">
-                      <span className="font-mono text-slate-700">{p.usuario}</span>
+                    <p className="text-xs text-tinta-500">
+                      <span className="font-mono text-tinta-700">{p.usuario}</span>
                       {conHuella.has(p.id) ? (
-                        <span className="ml-1.5 inline-flex items-center gap-0.5 text-emerald-700" title="Huella activada">
+                        <span className="ml-1.5 inline-flex items-center gap-0.5 text-verde-700" title="Huella activada">
                           <Fingerprint className="inline size-3.5" aria-hidden /> huella
                         </span>
                       ) : (
-                        <span className="ml-1.5 inline-flex items-center gap-0.5 text-amber-700" title="Sin huella activada">
+                        <span className="ml-1.5 inline-flex items-center gap-0.5 text-oro-700" title="Sin huella activada">
                           <Fingerprint className="inline size-3.5" aria-hidden /> sin huella
                         </span>
                       )}
                       {p.rut ? ` · ${p.rut}` : ""}
                     </p>
                   </td>
-                  <td className="px-4 py-3">{p.cargo ?? "—"}</td>
-                  <td className="px-4 py-3">
+                  <td className="col-start-1 text-xs text-tinta-600 md:px-4 md:py-3 md:text-sm md:text-inherit">{p.cargo ?? "—"}</td>
+                  <td className="col-start-1 md:px-4 md:py-3">
                     {p.horarios.length === 0 ? (
-                      <span className="text-amber-700">Sin horario</span>
+                      <span className="text-oro-700">Sin horario</span>
                     ) : p.ciclo_semanas > 1 ? (
                       <span className="inline-flex items-center gap-1.5">
-                        <span className="rounded bg-violet-100 px-1.5 py-0.5 text-xs font-medium text-violet-700">
+                        <span className="rounded bg-noche-100 px-1.5 py-0.5 text-xs font-medium text-noche-700">
                           Rotativo {p.ciclo_semanas} sem.
                         </span>
-                        <span className="text-xs text-slate-500">
+                        <span className="text-xs text-tinta-500">
                           esta semana: {letraSemana(semanaDelCiclo(hoy, p.ciclo_inicio, p.ciclo_semanas))}
                         </span>
                       </span>
@@ -132,8 +137,8 @@ export default async function PersonalPage() {
                             title={d.nombre}
                             className={`w-6 rounded text-center text-xs ${
                               diasTrabajo.has(d.n)
-                                ? "bg-sky-100 font-semibold text-sky-800"
-                                : "text-slate-300"
+                                ? "bg-turquesa-100 font-semibold text-turquesa-900"
+                                : "text-tinta-300"
                             }`}
                           >
                             {d.corto[0]}
@@ -142,7 +147,7 @@ export default async function PersonalPage() {
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
+                  <td className="col-start-2 row-start-3 text-right text-xs tabular-nums text-tinta-600 md:px-4 md:py-3 md:text-sm md:text-inherit">
                     {p.horarios.length
                       ? duracion(
                           minutosSemana(
@@ -155,17 +160,18 @@ export default async function PersonalPage() {
                         )
                       : "—"}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="col-start-2 row-start-2 text-right text-xs md:px-4 md:py-3 md:text-left md:text-sm">
                     {p.activo ? (
-                      <span className="text-emerald-700">Activo</span>
+                      <span className="text-verde-700">Activo</span>
                     ) : (
                       <span>Desactivado</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="col-start-2 row-start-1 text-right md:px-4 md:py-3">
+                    {/* En el teléfono toda la ficha es tocable */}
                     <Link
                       href={`/admin/personal/${p.id}`}
-                      className="inline-flex items-center gap-1 rounded-lg px-2 py-1 font-medium text-sky-700 hover:bg-sky-50"
+                      className="inline-flex items-center gap-1 rounded-lg font-medium text-turquesa-700 after:absolute after:inset-0 hover:bg-turquesa-50 md:px-2 md:py-1 md:after:hidden"
                     >
                       Editar <ChevronRight className="size-4" aria-hidden />
                     </Link>
@@ -178,8 +184,8 @@ export default async function PersonalPage() {
       </div>
 
       <section className={tarjeta}>
-        <h2 className="mb-4 flex items-center gap-2 font-semibold">
-          <UserPlus className="size-5 text-sky-600" aria-hidden /> Nueva persona
+        <h2 className="mb-4 flex items-center gap-2 text-lg text-noche-900">
+          <UserPlus className="size-5 text-turquesa-600" aria-hidden /> Nueva persona
         </h2>
         <NuevaPersonaForm />
       </section>

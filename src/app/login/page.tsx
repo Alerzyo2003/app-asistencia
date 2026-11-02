@@ -1,27 +1,39 @@
 "use client";
 
+import Image from "next/image";
 import { useActionState } from "react";
 import { Loader2, LogIn } from "lucide-react";
 import { iniciarSesion, type EstadoLogin } from "./actions";
 
 const inicial: EstadoLogin = { error: null };
 
+const campoLogin =
+  "w-full rounded-2xl border border-tinta-300 bg-white px-4 py-3 text-base outline-none focus:border-turquesa-500 focus:ring-2 focus:ring-turquesa-200";
+
 export default function LoginPage() {
   const [estado, accion, pendiente] = useActionState(iniciarSesion, inicial);
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-slate-50 px-4">
+    <main className="pt-seguro flex min-h-dvh flex-col bg-noche-900 sm:items-center sm:justify-center sm:gap-8 sm:p-6">
+      <div className="flex flex-1 items-center justify-center px-10 py-8 sm:flex-none sm:p-0">
+        <Image
+          src="/logo-dignidad.png"
+          alt="Dignidad, Clínica Odontológica. Que sonreír sea costumbre"
+          width={957}
+          height={727}
+          priority
+          className="h-auto max-h-[38dvh] w-full max-w-64 object-contain"
+        />
+      </div>
+
       <form
         action={accion}
-        className="w-full max-w-sm space-y-5 rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200"
+        className="space-y-4 rounded-t-[2.5rem] bg-white px-6 pt-8 pb-[calc(env(safe-area-inset-bottom)+2rem)] sm:w-full sm:max-w-sm sm:rounded-[2.5rem] sm:p-8"
       >
-        <header className="space-y-1 text-center">
-          <h1 className="text-xl font-semibold text-slate-900">Control de asistencia</h1>
-          <p className="text-sm text-slate-500">Clínica Odontológica Dignidad</p>
-        </header>
+        <h1 className="text-center text-2xl text-noche-900">Control de asistencia</h1>
 
         <label className="block space-y-1.5">
-          <span className="text-sm font-medium text-slate-700">Usuario</span>
+          <span className="text-sm font-medium text-tinta-700">Usuario</span>
           <input
             name="usuario"
             type="text"
@@ -31,23 +43,23 @@ export default function LoginPage() {
             autoCorrect="off"
             spellCheck={false}
             required
-            className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-base outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+            className={campoLogin}
           />
         </label>
 
         <label className="block space-y-1.5">
-          <span className="text-sm font-medium text-slate-700">Contraseña</span>
+          <span className="text-sm font-medium text-tinta-700">Contraseña</span>
           <input
             name="password"
             type="password"
             autoComplete="current-password"
             required
-            className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-base outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+            className={campoLogin}
           />
         </label>
 
         {estado.error && (
-          <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">
+          <p role="alert" className="rounded-2xl bg-carmin-50 p-3 text-sm text-carmin-700">
             {estado.error}
           </p>
         )}
@@ -55,7 +67,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={pendiente}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-sky-600 py-3 font-semibold text-white transition hover:bg-sky-700 disabled:opacity-60"
+          className="flex min-h-13 w-full items-center justify-center gap-2 rounded-2xl bg-noche-900 py-3 font-semibold text-white transition hover:bg-noche-700 disabled:opacity-60"
         >
           {pendiente ? (
             <Loader2 className="size-5 animate-spin" aria-hidden />

@@ -72,7 +72,7 @@ export function ActivarHuella() {
 
   if (listo) {
     return (
-      <section className="flex items-start gap-3 rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-800 ring-1 ring-emerald-200">
+      <section className="flex items-start gap-3 rounded-3xl bg-verde-50 p-4 text-sm text-verde-800 ring-1 ring-verde-200">
         <ShieldCheck className="mt-0.5 size-5 shrink-0" aria-hidden />
         <p>{listo}</p>
       </section>
@@ -80,21 +80,21 @@ export function ActivarHuella() {
   }
 
   return (
-    <section className="space-y-3 rounded-2xl bg-white p-4 shadow-sm ring-2 ring-violet-300">
+    <section className="space-y-3 rounded-3xl bg-white p-4 shadow-md ring-2 ring-oro-400">
       <div className="flex items-start gap-3">
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-oro-100 text-oro-800">
           <Fingerprint className="size-6" aria-hidden />
         </span>
         <div className="text-sm">
-          <p className="font-semibold text-slate-900">Activa tu huella o Face ID</p>
-          <p className="text-slate-600">
+          <p className="font-semibold text-tinta-900">Activa tu huella o Face ID</p>
+          <p className="text-tinta-600">
             Mientras no la actives, tus marcas quedan en revisión. Pide tu código a administración.
           </p>
         </div>
       </div>
 
       {!soportado ? (
-        <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+        <p className="rounded-xl bg-oro-50 p-3 text-sm text-oro-800">
           Este navegador no permite usar la huella. Abre la app en Chrome (Android) o Safari (iPhone).
         </p>
       ) : !opciones ? (
@@ -106,13 +106,13 @@ export function ActivarHuella() {
             maxLength={6}
             value={codigo}
             onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ""))}
-            className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-center font-mono text-lg tracking-[0.3em] outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-200"
+            className="w-full min-w-0 rounded-xl border border-tinta-300 px-2 py-2.5 text-center font-mono text-lg tracking-[0.2em] placeholder:font-sans placeholder:text-sm placeholder:tracking-normal outline-none focus:border-turquesa-500 focus:ring-2 focus:ring-turquesa-200"
           />
           <button
             type="button"
             onClick={validarCodigo}
             disabled={codigo.length !== 6 || cargando}
-            className="shrink-0 rounded-xl bg-violet-600 px-4 font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+            className="min-h-12 shrink-0 rounded-xl bg-noche-900 px-4 font-semibold text-white hover:bg-noche-700 disabled:opacity-50"
           >
             {cargando ? <Loader2 className="size-5 animate-spin" /> : "Continuar"}
           </button>
@@ -122,14 +122,14 @@ export function ActivarHuella() {
           type="button"
           onClick={registrar}
           disabled={cargando}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 py-3 font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
+          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-noche-900 py-3 font-semibold text-white hover:bg-noche-700 disabled:opacity-60"
         >
           {cargando ? <Loader2 className="size-5 animate-spin" /> : <Fingerprint className="size-5" />}
           Registrar mi huella
         </button>
       )}
 
-      {error && <p className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
+      {error && <p className="rounded-xl bg-carmin-50 p-3 text-sm text-carmin-700">{error}</p>}
     </section>
   );
 }

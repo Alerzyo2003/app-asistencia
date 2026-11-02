@@ -6,7 +6,7 @@
  * puede cambiar o marcar como libre. Navegación con ?semana=YYYY-MM-DD.
  */
 import Link from "next/link";
-import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
 import { ZONA_HORARIA } from "@/lib/config";
@@ -25,6 +25,7 @@ import {
 import { FilaSemana, type CeldaDia } from "./FilaSemana";
 import { CopiarSemana } from "./CopiarSemana";
 import { CargarPlantilla } from "./CargarPlantilla";
+import { cabeceraTabla, cajaTabla, cuerpoTabla, tabla } from "../estilos";
 
 type Props = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -94,10 +95,8 @@ export default async function TurnosPage({ searchParams }: Props) {
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="flex items-center gap-2 text-xl font-semibold">
-            <CalendarDays className="size-6 text-sky-600" aria-hidden /> Turnos
-          </h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-2xl text-noche-900">Turnos</h1>
+          <p className="text-sm text-tinta-500">
             Carga el mes completo con la planilla Excel, o ajusta días puntuales en la grilla.
           </p>
         </div>
@@ -105,26 +104,26 @@ export default async function TurnosPage({ searchParams }: Props) {
 
       <CargarPlantilla lunesActual={lunesDe(hoy)} />
 
-      <div className="flex flex-wrap items-end justify-between gap-4 border-t border-slate-200 pt-5">
-        <h2 className="font-semibold">Ajustar una semana</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-tinta-200 pt-5">
+        <h2 className="text-lg text-noche-900">Ajustar una semana</h2>
         <CopiarSemana lunes={lunes} />
       </div>
 
       {/* Navegación de semanas */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center justify-center gap-2 md:justify-start">
         <Link
           href={`/admin/turnos?semana=${sumarDias(lunes, -7)}`}
-          className="rounded-lg p-2 text-slate-600 ring-1 ring-slate-200 hover:bg-white"
+          className="flex size-11 items-center justify-center rounded-xl bg-white text-tinta-600 ring-1 ring-tinta-200 hover:bg-tinta-100 md:size-9"
           aria-label="Semana anterior"
         >
           <ChevronLeft className="size-5" />
         </Link>
-        <p className="min-w-48 text-center font-medium">
+        <p className="min-w-0 flex-1 text-center font-medium tabular-nums md:min-w-48 md:flex-none">
           Semana del {diaMes(fechas[0])} al {diaMes(fechas[6])}
         </p>
         <Link
           href={`/admin/turnos?semana=${sumarDias(lunes, 7)}`}
-          className="rounded-lg p-2 text-slate-600 ring-1 ring-slate-200 hover:bg-white"
+          className="flex size-11 items-center justify-center rounded-xl bg-white text-tinta-600 ring-1 ring-tinta-200 hover:bg-tinta-100 md:size-9"
           aria-label="Semana siguiente"
         >
           <ChevronRight className="size-5" />
@@ -132,7 +131,7 @@ export default async function TurnosPage({ searchParams }: Props) {
         {!esEstaSemana && (
           <Link
             href="/admin/turnos"
-            className="rounded-lg px-3 py-2 text-sm font-medium text-sky-700 hover:bg-sky-50"
+            className="rounded-lg px-3 py-2 text-sm font-medium text-turquesa-700 hover:bg-turquesa-50"
           >
             Ir a esta semana
           </Link>
@@ -140,32 +139,28 @@ export default async function TurnosPage({ searchParams }: Props) {
       </div>
 
       {filas.length === 0 ? (
-        <p className="rounded-2xl bg-white p-8 text-center text-slate-500 ring-1 ring-slate-200">
+        <p className="rounded-3xl bg-white p-8 text-center text-tinta-500 ring-1 ring-tinta-200">
           No hay personal activo. Créalo en la pestaña Personal.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-          <table className="w-full min-w-[1080px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs text-slate-500">
+        <div className={cajaTabla}>
+          <table className={`${tabla} md:min-w-[1080px]`}>
+            <thead className={cabeceraTabla}>
               <tr>
-                <th className="sticky left-0 z-[1] bg-slate-50 px-3 py-3 font-semibold uppercase tracking-wide">
-                  Persona
-                </th>
+                <th className="sticky left-0 z-[1] bg-tinta-50 px-3 py-3 font-semibold">Persona</th>
                 {fechas.map((f, i) => (
                   <th
                     key={f}
-                    className={`px-1 py-3 text-center ${f === hoy ? "text-sky-700" : ""}`}
+                    className={`px-1 py-3 text-center ${f === hoy ? "text-turquesa-700" : ""}`}
                   >
-                    <span className="block font-semibold uppercase tracking-wide">
-                      {DIAS[i].corto}
-                    </span>
+                    <span className="block font-semibold">{DIAS[i].corto}</span>
                     <span className="tabular-nums">{diaMes(f)}</span>
                   </th>
                 ))}
                 <th className="px-3 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className={cuerpoTabla}>
               {filas.map((p) => (
                 <FilaSemana
                   key={`${p.id}-${lunes}`}
@@ -185,8 +180,8 @@ export default async function TurnosPage({ searchParams }: Props) {
         </div>
       )}
 
-      <p className="flex items-center gap-2 text-xs text-slate-500">
-        <span className="inline-block size-3 rounded bg-violet-100 ring-1 ring-violet-300" />
+      <p className="flex items-center gap-2 text-xs text-tinta-500">
+        <span className="inline-block size-3 shrink-0 rounded bg-oro-100 ring-1 ring-oro-400" />
         Distinto del horario base · cada fila se guarda por separado
       </p>
     </div>

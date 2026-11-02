@@ -18,7 +18,7 @@ import { CalendarSync, ClipboardCopy, Copy, CopyCheck, Save, TriangleAlert } fro
 
 import { guardarHorario, type EstadoAccion } from "../actions";
 import { BotonEnviar, MensajeAccion } from "../../ui";
-import { botonPrimario, botonSecundario, campo, etiqueta } from "../../estilos";
+import { anchoMovil, botonPrimario, botonSecundario, campo, etiqueta, rotuloMovil } from "../../estilos";
 import { duracion } from "@/lib/formato";
 import {
   DIAS,
@@ -143,8 +143,8 @@ export function HorarioForm({
 
       {/* Copiar el horario de otra persona */}
       {otras.length > 0 && (
-        <div className="flex flex-col gap-2 rounded-xl border border-dashed border-sky-300 bg-sky-50/50 p-3 sm:flex-row sm:items-center">
-          <label htmlFor="copiar-de" className="flex items-center gap-1.5 text-sm font-medium text-sky-900">
+        <div className="flex flex-col gap-2 rounded-xl border border-dashed border-turquesa-400 bg-turquesa-50/60 p-3 sm:flex-row sm:items-center">
+          <label htmlFor="copiar-de" className="flex items-center gap-1.5 text-sm font-medium text-turquesa-900">
             <ClipboardCopy className="size-4" aria-hidden /> Copiar horario de
           </label>
           <select
@@ -164,14 +164,14 @@ export function HorarioForm({
         </div>
       )}
       {copiadoDe && (
-        <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200">
+        <p className="rounded-xl bg-oro-50 p-3 text-sm text-oro-900 ring-1 ring-oro-200">
           Se copió el horario de <strong>{copiadoDe}</strong>. Ajusta lo que necesites y presiona{" "}
           <strong>Guardar horario</strong> (aún no se ha guardado).
         </p>
       )}
 
       {/* Configuración del ciclo */}
-      <div className="grid gap-4 rounded-xl bg-slate-50 p-4 sm:grid-cols-2">
+      <div className="grid gap-4 rounded-xl bg-tinta-50 p-4 sm:grid-cols-2">
         <label className="space-y-1">
           <span className={etiqueta}>¿Cada cuánto se repite su horario?</span>
           <select
@@ -185,7 +185,7 @@ export function HorarioForm({
             className={campo}
           >
             <option value={1}>Todas las semanas igual</option>
-            <option value={2}>Cada 2 semanas (turnos A / B intercalados)</option>
+            <option value={2}>Cada 2 semanas (A / B)</option>
             <option value={3}>Cada 3 semanas (A / B / C)</option>
             <option value={4}>Cada 4 semanas (A / B / C / D)</option>
           </select>
@@ -206,18 +206,20 @@ export function HorarioForm({
         )}
 
         {ciclo > 1 && (
-          <p className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2">
-            <CalendarSync className="size-4 text-violet-600" aria-hidden />
-            Esta semana (lunes {diaMes(lunesActual)}) le toca la{" "}
-            <strong className="text-violet-700">Semana {letraSemana(actualCiclo)}</strong>. Luego se
-            alternan solas.
+          <p className="flex items-start gap-2 text-sm text-tinta-700 sm:col-span-2 sm:items-center">
+            <CalendarSync className="size-4 shrink-0 text-turquesa-600" aria-hidden />
+            <span>
+              Esta semana (lunes {diaMes(lunesActual)}) le toca la{" "}
+              <strong className="text-noche-900">Semana {letraSemana(actualCiclo)}</strong>. Luego se
+              alternan solas.
+            </span>
           </p>
         )}
       </div>
 
       {/* Pestañas de semanas */}
       {ciclo > 1 && (
-        <div className="flex flex-wrap gap-1 border-b border-slate-200" role="tablist">
+        <div className="flex flex-wrap gap-1 border-b border-tinta-200" role="tablist">
           {Array.from({ length: ciclo }, (_, i) => i + 1).map((s) => (
             <button
               key={s}
@@ -225,18 +227,18 @@ export function HorarioForm({
               role="tab"
               aria-selected={pestana === s}
               onClick={() => setPestana(s)}
-              className={`-mb-px rounded-t-lg border px-4 py-2 text-sm font-medium ${
+              className={`-mb-px min-h-11 rounded-t-lg border px-3 py-2 text-sm font-medium sm:px-4 ${
                 pestana === s
-                  ? "border-slate-200 border-b-white bg-white text-sky-700"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "border-tinta-200 border-b-white bg-white text-turquesa-700"
+                  : "border-transparent text-tinta-500 hover:text-tinta-800"
               }`}
             >
               Semana {letraSemana(s)}
-              <span className="ml-1.5 text-xs font-normal text-slate-400">
+              <span className="ml-1.5 text-xs font-normal text-tinta-400">
                 {duracion(totalDe(semanas[s - 1]))}
               </span>
               {s === actualCiclo && (
-                <span className="ml-1.5 rounded bg-violet-100 px-1.5 py-0.5 text-xs text-violet-700">
+                <span className="ml-1.5 rounded bg-noche-100 px-1.5 py-0.5 text-xs text-noche-700">
                   actual
                 </span>
               )}
@@ -250,55 +252,67 @@ export function HorarioForm({
         const s = i + 1;
         return (
           <div key={s} hidden={s !== pestana} className="overflow-x-auto">
-            <table className="w-full min-w-[520px] text-left text-sm">
-              <thead className="text-xs uppercase tracking-wide text-slate-500">
+            <table className="block w-full text-left text-sm md:table md:min-w-[520px]">
+              <thead className="hidden text-xs text-tinta-500 md:table-header-group">
                 <tr>
-                  <th className="py-2 pr-3">Día</th>
-                  <th className="px-2 py-2">Entrada</th>
-                  <th className="px-2 py-2">Salida</th>
-                  <th className="px-2 py-2">Tolerancia (min)</th>
-                  <th className="py-2 pl-2 text-right">Horas</th>
+                  <th className="py-2 pr-3 font-semibold">Día</th>
+                  <th className="px-2 py-2 font-semibold">Entrada</th>
+                  <th className="px-2 py-2 font-semibold">Salida</th>
+                  <th className="px-2 py-2 font-semibold">Tolerancia (min)</th>
+                  <th className="py-2 pl-2 text-right font-semibold">Horas</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="block divide-y divide-tinta-100 md:table-row-group">
                 {sem.map((f) => {
                   const error = f.trabaja ? validarDia(f) : null;
                   const n = f.dia_semana;
+                  // En el teléfono, un día libre es solo una línea
+                  const celdaCampo = `${f.trabaja ? "" : "hidden"} min-w-0 md:table-cell md:px-2 md:py-2`;
                   return (
-                    <tr key={n} className={f.trabaja ? "" : "opacity-50"}>
-                      <td className="py-2 pr-3">
-                        <label className="flex items-center gap-2 font-medium">
+                    <tr
+                      key={n}
+                      className={`grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_5rem] items-end gap-x-2 gap-y-2 py-2.5 md:table-row ${
+                        f.trabaja ? "" : "opacity-50"
+                      }`}
+                    >
+                      <td className="col-span-2 md:py-2 md:pr-3">
+                        <label className="flex min-h-7 items-center gap-2.5 font-medium md:min-h-0 md:gap-2">
                           <input
                             type="checkbox"
                             name={`trabaja_${s}_${n}`}
                             checked={f.trabaja}
                             onChange={(e) => cambiar(s, n, { trabaja: e.target.checked })}
-                            className="size-4 accent-sky-600"
+                            className="size-5 accent-noche-900 md:size-4"
                           />
                           {DIAS[n - 1].nombre}
                         </label>
                       </td>
-                      <td className="px-2 py-2">
+                      <td className={celdaCampo}>
+                        <span className={rotuloMovil}>Entrada</span>
                         <input
                           type="time"
                           name={`entrada_${s}_${n}`}
                           value={f.hora_entrada}
                           disabled={!f.trabaja}
                           onChange={(e) => cambiar(s, n, { hora_entrada: e.target.value })}
-                          className={campo}
+                          className={`${campo} max-md:px-2`}
+                          aria-label={`Entrada ${DIAS[n - 1].nombre}`}
                         />
                       </td>
-                      <td className="px-2 py-2">
+                      <td className={celdaCampo}>
+                        <span className={rotuloMovil}>Salida</span>
                         <input
                           type="time"
                           name={`salida_${s}_${n}`}
                           value={f.hora_salida}
                           disabled={!f.trabaja}
                           onChange={(e) => cambiar(s, n, { hora_salida: e.target.value })}
-                          className={campo}
+                          className={`${campo} max-md:px-2`}
+                          aria-label={`Salida ${DIAS[n - 1].nombre}`}
                         />
                       </td>
-                      <td className="px-2 py-2">
+                      <td className={celdaCampo}>
+                        <span className={rotuloMovil}>Tol. (min)</span>
                         <input
                           type="number"
                           name={`tolerancia_${s}_${n}`}
@@ -307,14 +321,15 @@ export function HorarioForm({
                           value={f.tolerancia_minutos}
                           disabled={!f.trabaja}
                           onChange={(e) => cambiar(s, n, { tolerancia_minutos: Number(e.target.value) })}
-                          className={campo}
+                          className={`${campo} max-md:px-2`}
+                          aria-label={`Tolerancia ${DIAS[n - 1].nombre}`}
                         />
                       </td>
-                      <td className="py-2 pl-2 text-right tabular-nums">
+                      <td className="col-start-3 row-start-1 text-right tabular-nums md:py-2 md:pl-2">
                         {!f.trabaja ? (
                           "Libre"
                         ) : error ? (
-                          <span className="text-xs text-rose-600">Revisar</span>
+                          <span className="text-xs text-carmin-600">Revisar</span>
                         ) : (
                           duracion(minutosDelDia(f))
                         )}
@@ -323,9 +338,9 @@ export function HorarioForm({
                   );
                 })}
               </tbody>
-              <tfoot>
-                <tr className="border-t border-slate-200 font-semibold">
-                  <td colSpan={4} className="py-3 pr-3 text-right text-slate-600">
+              <tfoot className="block md:table-footer-group">
+                <tr className="flex justify-between border-t border-tinta-200 font-semibold md:table-row">
+                  <td colSpan={4} className="py-3 pr-3 text-tinta-600 md:text-right">
                     Total {ciclo > 1 ? `Semana ${letraSemana(s)}` : "semanal"}
                   </td>
                   <td className="py-3 pl-2 text-right tabular-nums">{duracion(totalDe(sem))}</td>
@@ -337,7 +352,7 @@ export function HorarioForm({
       })}
 
       {excede && (
-        <p className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+        <p className="flex items-start gap-2 rounded-xl bg-oro-50 p-3 text-sm text-oro-800">
           <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
           Supera las {JORNADA_MAX_SEMANAL_H} horas semanales. Ojo: este total incluye la colación,
           que no cuenta como jornada. Revisa si corresponde o si parte son horas extra.
@@ -347,14 +362,14 @@ export function HorarioForm({
       <MensajeAccion estado={estado} />
 
       <div className="flex flex-wrap gap-2">
-        <BotonEnviar className={botonPrimario}>
+        <BotonEnviar className={`${botonPrimario} ${anchoMovil}`}>
           <Save className="size-4" aria-hidden /> Guardar horario
         </BotonEnviar>
-        <button type="button" onClick={copiarLunes} className={botonSecundario}>
+        <button type="button" onClick={copiarLunes} className={`${botonSecundario} ${anchoMovil}`}>
           <CopyCheck className="size-4" aria-hidden /> Copiar lunes a mar–vie
         </button>
         {ciclo > 1 && pestana > 1 && (
-          <button type="button" onClick={copiarDeA} className={botonSecundario}>
+          <button type="button" onClick={copiarDeA} className={`${botonSecundario} ${anchoMovil}`}>
             <Copy className="size-4" aria-hidden /> Copiar días de la Semana A
           </button>
         )}

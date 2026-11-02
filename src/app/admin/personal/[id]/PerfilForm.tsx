@@ -5,7 +5,7 @@ import { Save } from "lucide-react";
 
 import { actualizarPersona, type EstadoAccion } from "../actions";
 import { BotonEnviar, MensajeAccion } from "../../ui";
-import { botonPrimario, campo, etiqueta } from "../../estilos";
+import { anchoMovil, botonPrimario, campo, etiqueta } from "../../estilos";
 import { correoVisible } from "@/lib/usuario";
 
 export type DatosPerfil = {
@@ -77,14 +77,14 @@ export function PerfilForm({ persona, esUnoMismo }: { persona: DatosPerfil; esUn
           {/* Un <select> deshabilitado no se envía: mandamos el valor aparte */}
           {esUnoMismo && <input type="hidden" name="rol" value={persona.rol} />}
           {esUnoMismo && (
-            <span className="text-xs text-slate-500">No puedes cambiar tu propio rol.</span>
+            <span className="text-xs text-tinta-500">No puedes cambiar tu propio rol.</span>
           )}
         </label>
       </div>
 
       <MensajeAccion estado={estado} />
 
-      <BotonEnviar className={botonPrimario}>
+      <BotonEnviar className={`${botonPrimario} ${anchoMovil}`}>
         <Save className="size-4" aria-hidden /> Guardar datos
       </BotonEnviar>
     </form>

@@ -2,14 +2,18 @@
  * Barra de filtros. Es un <form method="GET"> normal: al enviar, los
  * filtros quedan en la URL y la página (Server Component) vuelve a consultar.
  * No necesita JavaScript en el navegador.
+ *
+ * En el teléfono se muestra solo un resumen de lo filtrado; la casilla oculta
+ * despliega el formulario sin JavaScript. Desde md siempre está abierto.
  */
-import { Download, Filter } from "lucide-react";
+import { Download, Filter, SlidersHorizontal } from "lucide-react";
 
 import type { Empleado } from "@/lib/consultas";
 import { filtrosAQuery, type Filtros } from "@/lib/filtros";
+import { fechaCorta } from "@/lib/formato";
+import { botonPrimario, botonSecundario, campo, etiqueta } from "./estilos";
 
-const claseCampo =
-  "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200";
+const NOMBRE_ESTADO = { todas: null, validas: "Solo válidas", revision: "En revisión" } as const;
 
 export function FiltrosForm({
   accion,
@@ -24,59 +28,82 @@ export function FiltrosForm({
   /** Qué exporta el botón CSV de esta vista */
   exportar: "marcas" | "jornadas";
 }) {
+  const urlExcel = `/admin/exportar?${filtrosAQuery(filtros, { tipo: exportar })}`;
+  const persona = empleados.find((e) => e.id === filtros.empleado)?.nombre ?? "Todo el equipo";
+  const estado = NOMBRE_ESTADO[filtros.estado];
+
   return (
-    <form
-      method="GET"
-      action={accion}
-      className="grid grid-cols-2 gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 md:grid-cols-[repeat(4,minmax(0,1fr))_auto]"
-    >
-      <label className="space-y-1">
-        <span className="text-xs font-medium text-slate-600">Desde</span>
-        <input type="date" name="desde" defaultValue={filtros.desde} className={claseCampo} />
-      </label>
+    <div>
+      <input id="ver-filtros" type="checkbox" className="peer sr-only" aria-label="Mostrar filtros" />
 
-      <label className="space-y-1">
-        <span className="text-xs font-medium text-slate-600">Hasta</span>
-        <input type="date" name="hasta" defaultValue={filtros.hasta} className={claseCampo} />
-      </label>
-
-      <label className="space-y-1">
-        <span className="text-xs font-medium text-slate-600">Persona</span>
-        <select name="empleado" defaultValue={filtros.empleado ?? ""} className={claseCampo}>
-          <option value="">Todo el equipo</option>
-          {empleados.map((e) => (
-            <option key={e.id} value={e.id}>
-              {e.nombre}
-              {e.activo ? "" : " (inactivo)"}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className="space-y-1">
-        <span className="text-xs font-medium text-slate-600">Estado</span>
-        <select name="estado" defaultValue={filtros.estado} className={claseCampo}>
-          <option value="todas">Todas</option>
-          <option value="validas">Solo válidas</option>
-          <option value="revision">En revisión</option>
-        </select>
-      </label>
-
-      <div className="col-span-2 flex items-end gap-2 md:col-span-1">
-        <button
-          type="submit"
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 md:flex-none"
+      <div className="flex items-stretch gap-2 rounded-2xl peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-turquesa-500 md:hidden">
+        <label
+          htmlFor="ver-filtros"
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-2xl bg-white px-4 py-2.5 shadow-sm ring-1 ring-tinta-200"
         >
-          <Filter className="size-4" aria-hidden /> Filtrar
-        </button>
+          <SlidersHorizontal className="size-5 shrink-0 text-turquesa-600" aria-hidden />
+          <span className="min-w-0 text-sm">
+            <span className="block font-medium tabular-nums">
+              {fechaCorta(filtros.desde)} al {fechaCorta(filtros.hasta)}
+            </span>
+            <span className="block truncate text-xs text-tinta-500">
+              {persona}
+              {estado ? `, ${estado.toLowerCase()}` : ""}
+            </span>
+          </span>
+        </label>
         {/* <a> normal (no <Link>): es una descarga, no una navegación */}
-        <a
-          href={`/admin/exportar?${filtrosAQuery(filtros, { tipo: exportar })}`}
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 md:flex-none"
-        >
+        <a href={urlExcel} className={`${botonSecundario} rounded-2xl shadow-sm`}>
           <Download className="size-4" aria-hidden /> Excel
         </a>
       </div>
-    </form>
+
+      <form
+        method="GET"
+        action={accion}
+        className="mt-2 hidden grid-cols-2 gap-3 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-tinta-200 peer-checked:grid md:mt-0 md:grid md:grid-cols-[repeat(4,minmax(0,1fr))_auto]"
+      >
+        <label className="min-w-0 space-y-1">
+          <span className={etiqueta}>Desde</span>
+          <input type="date" name="desde" defaultValue={filtros.desde} className={campo} />
+        </label>
+
+        <label className="min-w-0 space-y-1">
+          <span className={etiqueta}>Hasta</span>
+          <input type="date" name="hasta" defaultValue={filtros.hasta} className={campo} />
+        </label>
+
+        <label className="col-span-2 min-w-0 space-y-1 md:col-span-1">
+          <span className={etiqueta}>Persona</span>
+          <select name="empleado" defaultValue={filtros.empleado ?? ""} className={campo}>
+            <option value="">Todo el equipo</option>
+            {empleados.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.nombre}
+                {e.activo ? "" : " (inactivo)"}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="col-span-2 min-w-0 space-y-1 md:col-span-1">
+          <span className={etiqueta}>Estado</span>
+          <select name="estado" defaultValue={filtros.estado} className={campo}>
+            <option value="todas">Todas</option>
+            <option value="validas">Solo válidas</option>
+            <option value="revision">En revisión</option>
+          </select>
+        </label>
+
+        <div className="col-span-2 flex items-end gap-2 md:col-span-1">
+          <button type="submit" className={`${botonPrimario} flex-1 md:flex-none`}>
+            <Filter className="size-4" aria-hidden /> Filtrar
+          </button>
+          <a href={urlExcel} className={`${botonSecundario} max-md:hidden`}>
+            <Download className="size-4" aria-hidden /> Excel
+          </a>
+        </div>
+      </form>
+    </div>
   );
 }

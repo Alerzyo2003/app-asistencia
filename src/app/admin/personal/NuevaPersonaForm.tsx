@@ -6,7 +6,7 @@ import { KeyRound, UserPlus } from "lucide-react";
 import { crearPersona, type EstadoAccion } from "./actions";
 import { BotonEnviar, MensajeAccion } from "../ui";
 import { sugerirUsuario } from "@/lib/usuario";
-import { botonPrimario, botonSecundario, campo, etiqueta } from "../estilos";
+import { anchoMovil, botonPrimario, botonSecundario, campo, etiqueta } from "../estilos";
 
 /** Contraseña temporal fácil de dictar: sin 0/O ni 1/l/I. */
 function generarContrasena(): string {
@@ -69,7 +69,7 @@ export function NuevaPersonaForm() {
             }}
             className={`${campo} font-mono`}
           />
-          <span className="text-xs text-slate-500">Se sugiere con el nombre; puedes cambiarlo.</span>
+          <span className="text-xs text-tinta-500">Se sugiere con el nombre; puedes cambiarlo.</span>
         </label>
 
         <label className="space-y-1">
@@ -110,14 +110,15 @@ export function NuevaPersonaForm() {
             <button
               type="button"
               onClick={() => setPassword(generarContrasena())}
-              className={botonSecundario}
+              className={`${botonSecundario} shrink-0`}
               title="Generar contraseña"
+              aria-label="Generar contraseña"
             >
               <KeyRound className="size-4" aria-hidden />
               <span className="hidden sm:inline">Generar</span>
             </button>
           </div>
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-tinta-500">
             Anótala y entrégasela a la persona; no se vuelve a mostrar.
           </span>
         </label>
@@ -133,7 +134,7 @@ export function NuevaPersonaForm() {
 
       <MensajeAccion estado={estado} />
 
-      <BotonEnviar className={botonPrimario}>
+      <BotonEnviar className={`${botonPrimario} ${anchoMovil}`}>
         <UserPlus className="size-4" aria-hidden /> Crear cuenta
       </BotonEnviar>
     </form>

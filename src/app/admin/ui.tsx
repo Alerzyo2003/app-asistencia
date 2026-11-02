@@ -32,7 +32,7 @@ export function MensajeAccion({ estado }: { estado: EstadoAccion }) {
     <p
       role={estado.ok ? "status" : "alert"}
       className={`flex items-start gap-2 rounded-xl p-3 text-sm ${
-        estado.ok ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-700"
+        estado.ok ? "bg-verde-50 text-verde-800" : "bg-carmin-50 text-carmin-700"
       }`}
     >
       <Icono className="mt-0.5 size-4 shrink-0" aria-hidden />

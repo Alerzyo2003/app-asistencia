@@ -80,18 +80,18 @@ export default async function FichaPersonaPage({ params, searchParams }: Props) 
     }));
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
+    <div className="space-y-5 md:space-y-6">
+      <div className="space-y-1">
         <Link
           href="/admin/personal"
-          className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800"
+          className="-ml-1 inline-flex min-h-9 items-center gap-1 px-1 text-sm text-tinta-500 hover:text-tinta-800"
         >
           <ArrowLeft className="size-4" aria-hidden /> Personal
         </Link>
-        <h1 className="text-xl font-semibold">
+        <h1 className="text-2xl text-noche-900">
           {persona.nombre}
           {!persona.activo && (
-            <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 align-middle text-xs font-medium text-slate-600">
+            <span className="ml-2 rounded-full bg-tinta-100 px-2 py-0.5 align-middle text-xs font-medium text-tinta-600">
               Desactivado
             </span>
           )}
@@ -99,19 +99,19 @@ export default async function FichaPersonaPage({ params, searchParams }: Props) 
       </div>
 
       {nuevo && (
-        <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">
+        <p className="rounded-xl bg-verde-50 p-3 text-sm text-verde-800">
           Cuenta creada. Ahora asígnale su horario para que el reporte pueda calcular atrasos.
         </p>
       )}
       {aviso === "perfil" && (
-        <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+        <p className="rounded-xl bg-oro-50 p-3 text-sm text-oro-800">
           La cuenta se creó, pero algunos datos del perfil no se guardaron. Revísalos abajo.
         </p>
       )}
 
       <section className={tarjeta}>
-        <h2 className="mb-4 flex items-center gap-2 font-semibold">
-          <CalendarClock className="size-5 text-sky-600" aria-hidden /> Horario y turnos
+        <h2 className="mb-4 flex items-center gap-2 text-lg text-noche-900">
+          <CalendarClock className="size-5 text-turquesa-600" aria-hidden /> Horario y turnos
         </h2>
         <HorarioForm
           usuarioId={persona.id}
@@ -125,8 +125,8 @@ export default async function FichaPersonaPage({ params, searchParams }: Props) 
       </section>
 
       <section className={tarjeta}>
-        <h2 className="mb-4 flex items-center gap-2 font-semibold">
-          <Fingerprint className="size-5 text-violet-600" aria-hidden /> Huella / Face ID para marcar
+        <h2 className="mb-4 flex items-center gap-2 text-lg text-noche-900">
+          <Fingerprint className="size-5 text-turquesa-600" aria-hidden /> Huella / Face ID para marcar
         </h2>
         <HuellaForm
           usuarioId={persona.id}
@@ -136,17 +136,17 @@ export default async function FichaPersonaPage({ params, searchParams }: Props) 
         />
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-5 md:gap-6 lg:grid-cols-2">
         <section className={tarjeta}>
-          <h2 className="mb-4 flex items-center gap-2 font-semibold">
-            <UserRound className="size-5 text-sky-600" aria-hidden /> Datos
+          <h2 className="mb-4 flex items-center gap-2 text-lg text-noche-900">
+            <UserRound className="size-5 text-turquesa-600" aria-hidden /> Datos
           </h2>
           <PerfilForm persona={persona as DatosPerfil} esUnoMismo={esUnoMismo} />
         </section>
 
         <section className={tarjeta}>
-          <h2 className="mb-4 flex items-center gap-2 font-semibold">
-            <ShieldCheck className="size-5 text-sky-600" aria-hidden /> Acceso
+          <h2 className="mb-4 flex items-center gap-2 text-lg text-noche-900">
+            <ShieldCheck className="size-5 text-turquesa-600" aria-hidden /> Acceso
           </h2>
           <AccesoForm usuarioId={persona.id} activo={persona.activo} esUnoMismo={esUnoMismo} />
         </section>

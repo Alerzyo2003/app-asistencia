@@ -127,7 +127,7 @@ export function CamaraFoto({ onCapturar, onCerrar }: Props) {
       role="dialog"
       aria-modal="true"
       aria-label="Tomar foto"
-      className="fixed inset-0 z-50 flex flex-col bg-black text-white"
+      className="pt-seguro fixed inset-0 z-50 flex flex-col bg-black text-white"
     >
       <div className="flex items-center justify-between p-4">
         <p className="font-medium">Foto de la marcación</p>
@@ -161,7 +161,7 @@ export function CamaraFoto({ onCapturar, onCerrar }: Props) {
         )}
       </div>
 
-      <div className="flex items-center justify-center gap-6 p-6 pb-10">
+      <div className="flex items-center justify-center gap-6 p-6 pb-[calc(env(safe-area-inset-bottom)+2.5rem)]">
         {captura ? (
           <>
             <button
@@ -174,7 +174,7 @@ export function CamaraFoto({ onCapturar, onCerrar }: Props) {
             <button
               type="button"
               onClick={usarFoto}
-              className="flex items-center gap-2 rounded-full bg-sky-500 px-6 py-3 font-semibold hover:bg-sky-600"
+              className="flex items-center gap-2 rounded-full bg-oro-400 px-6 py-3 font-semibold text-noche-900 hover:bg-oro-300"
             >
               <Camera className="size-5" /> Usar foto
             </button>

@@ -20,7 +20,7 @@ export function CopiarSemana({ lunes }: { lunes: string }) {
         );
         if (!ok) e.preventDefault();
       }}
-      className="flex flex-col items-end gap-2"
+      className="flex w-full flex-col gap-2 sm:w-auto sm:items-end"
     >
       <input type="hidden" name="lunes" value={lunes} />
       <BotonEnviar className={botonSecundario}>

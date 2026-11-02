@@ -1,1 +1,148 @@
 @import "tailwindcss";
+
+/*
+ * Identidad de la app: todo sale del logo de la Clínica Dignidad.
+ * Solo existen estas paletas; la de Tailwind se desactiva a propósito.
+ *
+ *   noche     fondo del logo: encabezados, botones principales
+ *   turquesa  figura izquierda: Entrada, enlaces, selección
+ *   oro       figura derecha: Salida, avisos, en revisión
+ *   verde     cabeza izquierda: correcto, válido
+ *   carmin    cabeza derecha: error, acciones peligrosas
+ *   tinta     neutros con un toque del azul del logo
+ */
+@theme {
+  --color-*: initial;
+  --color-white: #fff;
+  --color-black: #000;
+
+  --color-noche-50: #edf1f8;
+  --color-noche-100: #dae2f0;
+  --color-noche-200: #b7c6e0;
+  --color-noche-300: #8fa5cb;
+  --color-noche-400: #5f7aab;
+  --color-noche-500: #3b5a90;
+  --color-noche-600: #264474;
+  --color-noche-700: #18325b;
+  --color-noche-800: #0e2547;
+  --color-noche-900: #061b3a;
+
+  --color-turquesa-50: #e6f7fa;
+  --color-turquesa-100: #c7edf3;
+  --color-turquesa-200: #97dee9;
+  --color-turquesa-300: #5ccbdb;
+  --color-turquesa-400: #25b6cc;
+  --color-turquesa-500: #03a2bc;
+  --color-turquesa-600: #007a90;
+  --color-turquesa-700: #006374;
+  --color-turquesa-800: #0b5162;
+  --color-turquesa-900: #0e4453;
+
+  --color-oro-50: #fff8e8;
+  --color-oro-100: #feedc6;
+  --color-oro-200: #fddc8e;
+  --color-oro-300: #fdc95a;
+  --color-oro-400: #fcb62c;
+  --color-oro-500: #e89e12;
+  --color-oro-600: #bd7a08;
+  --color-oro-700: #96590a;
+  --color-oro-800: #7a470f;
+  --color-oro-900: #633a11;
+
+  --color-verde-50: #f1f7e7;
+  --color-verde-100: #e0eccb;
+  --color-verde-200: #c6dda0;
+  --color-verde-300: #a5c76f;
+  --color-verde-400: #85ae47;
+  --color-verde-500: #66932d;
+  --color-verde-600: #527a22;
+  --color-verde-700: #416119;
+  --color-verde-800: #344e16;
+  --color-verde-900: #2c3f16;
+
+  --color-carmin-50: #fcedf2;
+  --color-carmin-100: #f9d9e3;
+  --color-carmin-200: #f2b2c6;
+  --color-carmin-300: #e784a3;
+  --color-carmin-400: #d6517a;
+  --color-carmin-500: #c22e5b;
+  --color-carmin-600: #b01b49;
+  --color-carmin-700: #93163d;
+  --color-carmin-800: #781433;
+  --color-carmin-900: #64142d;
+
+  --color-tinta-50: #f3f6f9;
+  --color-tinta-100: #e8edf2;
+  --color-tinta-200: #d6dee6;
+  --color-tinta-300: #b9c5d1;
+  --color-tinta-400: #8c9bab;
+  --color-tinta-500: #5a6b80;
+  --color-tinta-600: #4a5a6e;
+  --color-tinta-700: #364559;
+  --color-tinta-800: #232f42;
+  --color-tinta-900: #121e31;
+
+  --font-sans: var(--fuente-texto), system-ui, sans-serif;
+  --font-titulo: var(--fuente-titulo), var(--fuente-texto), system-ui, sans-serif;
+
+  --animate-corazon: corazon 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  @keyframes corazon {
+    from {
+      transform: scale(0.94);
+    }
+    to {
+      transform: scale(1);
+    }
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  h1,
+  h2 {
+    font-family: var(--font-titulo);
+    font-weight: 500;
+    text-wrap: balance;
+  }
+
+  /* Foco visible con teclado en toda la app */
+  :focus-visible {
+    outline: 2px solid var(--color-turquesa-500);
+    outline-offset: 2px;
+  }
+
+  label:has(input[type="checkbox"]),
+  button:not(:disabled),
+  summary {
+    cursor: pointer;
+  }
+}
+
+/* En el teléfono el campo de hora abre el selector al tocarlo: el ícono solo quita espacio */
+@media (width < 48rem) {
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    display: none;
+  }
+}
+
+@utility pt-seguro {
+  padding-top: env(safe-area-inset-top);
+}
+
+@utility pb-seguro {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
